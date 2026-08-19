@@ -137,6 +137,7 @@ func main() {
 	mux.HandleFunc("/api/admin/login", api.AdminLoginHandler)
 	mux.HandleFunc("/api/admin/users", api.AdminGetUsersHandler)
 	mux.HandleFunc("/api/admin/stats", api.AdminGetStatsHandler)
+	mux.HandleFunc("/api/admin/sos/resolve", api.AdminResolveSOSHandler)
 
 	// Static Web Client & Admin Dashboard
 	fileServer := http.FileServer(http.Dir("./web"))

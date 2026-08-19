@@ -150,6 +150,11 @@ function renderUserTable(users) {
         <td><i class="fa-solid fa-user-shield" style="color: #ec4899;"></i> ${item.trusteeCount} Guardians</td>
         <td>${statusPill}</td>
         <td style="display: flex; gap: 8px;">
+          ${item.activeSos ? `
+            <button class="btn-logout" style="background: rgba(239, 68, 68, 0.15); color: var(--sos-red); border: 1px solid var(--sos-red); padding: 6px 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; border-radius: 6px; cursor: pointer;" onclick="adminResolveSOS('${item.activeSos.id}', '${u.id}')">
+              <i class="fa-solid fa-power-off"></i> Shut Off SOS
+            </button>
+          ` : ''}
           <button class="btn-inspect" onclick="openInspectModal('${u.id}')">
             <i class="fa-solid fa-map-location-dot"></i> Inspect Live GPS
           </button>
@@ -235,6 +240,16 @@ function openInspectModal(userId) {
     </div>
   `;
 
+  if (userItem.activeSos) {
+    sidebar.innerHTML += `
+      <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border);">
+        <button onclick="adminResolveSOS('${userItem.activeSos.id}', '${u.id}')" style="width: 100%; background: rgba(239, 68, 68, 0.15); color: var(--sos-red); border: 1px solid var(--sos-red); padding: 10px; border-radius: 8px; font-weight: 800; cursor: pointer;">
+          SHUT OFF SOS OVERRIDE
+        </button>
+      </div>
+    `;
+  }
+
   document.getElementById('inspectModal').classList.add('show');
 
   // Initialize Map
@@ -307,3 +322,31 @@ function connectAdminWebSocket() {
 
   ws.onclose = () => setTimeout(connectAdminWebSocket, 3000);
 }
+
+async function adminResolveSOS(sosEventId, userId) {
+  if (!confirm("Are you sure you want to forcibly shut off this distress call?")) return;
+
+  try {
+    const res = await fetch('/api/admin/sos/resolve', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Token': sessionStorage.getItem('raksha_admin_auth_token')
+      },
+      body: JSON.stringify({ sosEventId, userId, pin: "" })
+    });
+    
+    if (res.ok) {
+      alert("Distress call forcefully resolved by Admin.");
+      closeInspectModal();
+      loadAdminUsers();
+      loadAdminStats();
+    } else {
+      alert("Failed to resolve SOS.");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Network error: " + err.message);
+  }
+}
+

@@ -45,6 +45,7 @@ export default function App() {
   
   // Wards Map Tracking
   const [activeWards, setActiveWards] = useState<any[]>([]);
+  const [isActiveWardsModalVisible, setIsActiveWardsModalVisible] = useState(false);
   const [isMapModalVisible, setIsMapModalVisible] = useState(false);
   const [selectedWard, setSelectedWard] = useState<any | null>(null);
 
@@ -369,57 +370,70 @@ export default function App() {
 
   const renderHomeTab = () => (
     <>
-      {/* Modern Safety Code Card */}
-      <View style={styles.codeCard}>
-        <View style={styles.codeCardLeft}>
-          <Text style={styles.codeCardLabel}>YOUR SAFETY CODE</Text>
-          <Text style={styles.codeCardValue}>{currentUser.userCode || 'RAK-1001'}</Text>
-          <Text style={styles.codeCardSub}>Share this code with trusted family</Text>
+      {/* Top Code Banner */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(252, 211, 77, 0.15)', padding: 12, borderRadius: 16, marginBottom: 24 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Shield color="#b45309" size={20} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#b45309' }}>Your Safety Code: {currentUser.userCode || 'RAK-1001'}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.copyPillBtn}
-          onPress={() => Alert.alert('Code Copied', `Share code ${currentUser.userCode} with your family.`)}
-        >
-          <Text style={styles.copyPillBtnText}>Copy Code</Text>
+        <TouchableOpacity onPress={() => Alert.alert('Code Copied', `Share code ${currentUser.userCode} with your family.`)}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: '#212529' }}>COPY</Text>
         </TouchableOpacity>
       </View>
 
-      {/* HERO SOS CARD */}
-      <Animated.View style={[styles.heroBlackCard, isSOSActive && { backgroundColor: '#7f1d1d' }, { transform: [{ scale: pulseAnim }] }]}>
-        <View style={styles.heroCardHeader}>
-          <View>
-            <Text style={styles.heroCardTitle}>
-              {isSOSActive ? 'EMERGENCY DISPATCH' : 'One-Tap SOS Protection'}
+      {/* Hero Circular SOS Button */}
+      <View style={{ alignItems: 'center', marginVertical: 12 }}>
+        <Animated.View style={[{
+          width: 200, height: 200, borderRadius: 100,
+          backgroundColor: isSOSActive ? 'rgba(239, 68, 68, 0.15)' : 'rgba(33, 37, 41, 0.05)',
+          justifyContent: 'center', alignItems: 'center',
+          transform: [{ scale: pulseAnim }]
+        }]}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={handleSOSPress}
+            style={{
+              width: 150, height: 150, borderRadius: 75,
+              backgroundColor: isSOSActive ? '#ef4444' : '#212529',
+              justifyContent: 'center', alignItems: 'center',
+              shadowColor: isSOSActive ? '#ef4444' : '#212529',
+              shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.4, shadowRadius: 24, elevation: 10
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 2, marginBottom: 4 }}>
+              {isSOSActive ? 'ACTIVE' : 'PRESS FOR'}
             </Text>
-            <Text style={styles.heroCardSub}>
-              {isSOSActive ? 'Live 1-sec GPS telemetry broadcasting' : 'Instant alarm to all active guardians'}
-            </Text>
-          </View>
-          <View style={styles.heroStatusBadge}>
-            <Text style={styles.heroStatusBadgeText}>{isSOSActive ? 'ACTIVE' : 'READY'}</Text>
-          </View>
+            <Text style={{ color: '#fff', fontSize: 36, fontWeight: '900', letterSpacing: -1 }}>SOS</Text>
+          </TouchableOpacity>
+        </Animated.View>
+        <Text style={{ marginTop: 16, fontSize: 13, color: '#6b7280', fontWeight: '500' }}>
+          {isSOSActive ? 'Broadcasting live emergency data...' : 'Alerts all guardians instantly'}
+        </Text>
+      </View>
+
+      {/* Quick Status Grid */}
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+        <View style={[styles.whiteCard, { flex: 1, alignItems: 'center', padding: 12 }]}>
+          <Battery color={batteryLevel < 20 ? '#ef4444' : '#10b981'} size={20} style={{ marginBottom: 4 }} />
+          <Text style={{ fontSize: 11, color: '#6b7280', fontWeight: '600' }}>Battery</Text>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: '#212529', marginTop: 2 }}>{batteryLevel}%</Text>
         </View>
-
-        <TouchableOpacity
-          style={[styles.heroActionPill, isSOSActive && { backgroundColor: '#ffffff' }]}
-          activeOpacity={0.85}
-          onPress={handleSOSPress}
+        <TouchableOpacity 
+          style={[styles.whiteCard, { flex: 1, alignItems: 'center', padding: 12 }]}
+          activeOpacity={0.8}
+          onPress={() => setIsActiveWardsModalVisible(true)}
         >
-          <Text style={[styles.heroActionPillText, isSOSActive && { color: '#7f1d1d' }]}>
-            {isSOSActive ? 'Deactivate SOS (Enter PIN)' : 'Trigger Emergency SOS'}
-          </Text>
-          <View style={[styles.arrowCircleDark, isSOSActive && { backgroundColor: '#7f1d1d' }]}>
-            <Text style={{ fontSize: 13, color: isSOSActive ? '#ffffff' : '#212529', fontWeight: '900' }}>→</Text>
-          </View>
+          <MapPin color="#3b82f6" size={20} style={{ marginBottom: 4 }} />
+          <Text style={{ fontSize: 11, color: '#6b7280', fontWeight: '600' }}>Wards</Text>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: '#212529', marginTop: 2 }}>{activeWards.length} Active</Text>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
 
-      {/* Unified Status Hub */}
+      {/* Live GPS Broadcast Session Switch Card */}
       <View style={styles.whiteCard}>
-        <Text style={{ fontSize: 11, fontWeight: '800', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -6 }}>Active Systems</Text>
-        <View style={[styles.cardHeaderRow, { borderBottomWidth: 1, borderColor: '#f3f4f6', paddingBottom: 12 }]}>
-          <View style={styles.iconCircleSmall}>
-            <MapPin color="#212529" size={18} />
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.iconCircleSmall, { backgroundColor: isTracking ? 'rgba(252, 211, 77, 0.2)' : '#f3f4f6' }]}>
+            <MapPin color={isTracking ? "#b45309" : "#6b7280"} size={18} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardSectionTitle}>Track Me (Live GPS)</Text>
@@ -434,57 +448,8 @@ export default function App() {
             thumbColor={isTracking ? '#212529' : '#ffffff'}
           />
         </View>
-
-        {/* Telemetry Row Inside Hub */}
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={[styles.telemetryPill, { flex: 1, backgroundColor: '#f9fafb', borderWidth: 0 }]}>
-            <Battery color="#6b7280" size={14} style={{ marginRight: 6 }} />
-            <Text style={styles.telemetryPillText}>{batteryLevel}% Power</Text>
-          </View>
-          <View style={[styles.telemetryPill, { flex: 1.5, backgroundColor: '#f9fafb', borderWidth: 0 }]}>
-            <MapPin color="#6b7280" size={14} style={{ marginRight: 6 }} />
-            <Text style={styles.telemetryPillText}>
-              {currentCoords.lat.toFixed(4)}, {currentCoords.lng.toFixed(4)}
-            </Text>
-          </View>
-        </View>
       </View>
 
-      {/* Active Tracking Wards */}
-      {activeWards.length > 0 ? (
-        <View style={{ marginTop: 12 }}>
-          <Text style={{ fontSize: 13, fontWeight: '800', color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Active Wards</Text>
-          {activeWards.map(ward => (
-            <View key={ward.connectionId} style={styles.whiteCard}>
-              <View style={[styles.cardHeaderRow, { marginBottom: 10 }]}>
-                <View style={[styles.iconCircleSmall, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
-                  <Shield color="#ef4444" size={18} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardSectionTitle}>{ward.wardUser.fullName}</Text>
-                  <Text style={styles.cardSectionSub}>
-                    {ward.latestLocation?.isSos ? '🚨 SOS ACTIVE' : '🟢 Tracking Live'} • {ward.wardUser.batteryLevel}% Battery
-                  </Text>
-                  {ward.latestLocation && (
-                    <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
-                      📡 Network: {ward.latestLocation.networkType || 'WIFI'} • GPS: {ward.latestLocation.accuracyMeters < 20 ? 'Strong' : (ward.latestLocation.accuracyMeters > 50 ? 'Weak' : 'Fair')}
-                    </Text>
-                  )}
-                </View>
-                <TouchableOpacity
-                  style={{ backgroundColor: '#212529', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
-                  onPress={() => {
-                    setSelectedWard(ward);
-                    setIsMapModalVisible(true);
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>View Map</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
     </>
   );
 
@@ -688,7 +653,7 @@ export default function App() {
         {activeTab === 'HOME' ? renderHomeTab() : null}
         {activeTab === 'GUARDIANS' ? renderGuardiansTab() : null}
         {activeTab === 'PROFILE' ? renderProfileTab() : null}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 160 }} />
       </ScrollView>
 
       {/* Floating Bottom Navigation Bar */}
@@ -829,36 +794,92 @@ export default function App() {
             </TouchableOpacity>
           </View>
           {selectedWard?.latestLocation ? (
-            <MapView
-              style={{ width: '100%', height: '100%' }}
-              region={{
-                latitude: selectedWard.latestLocation.latitude,
-                longitude: selectedWard.latestLocation.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-            >
-              <Marker
-                coordinate={{
+            <View style={{ flex: 1, backgroundColor: '#e5e7eb', overflow: 'hidden' }}>
+              <MapView
+                style={StyleSheet.absoluteFillObject}
+                region={{
                   latitude: selectedWard.latestLocation.latitude,
                   longitude: selectedWard.latestLocation.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
                 }}
-                title={selectedWard.wardUser.fullName}
-                description={selectedWard.latestLocation.isSos ? "SOS ACTIVE" : "Tracking"}
-              />
-              {selectedWardTrail.length > 0 && (
-                <Polyline
-                  coordinates={selectedWardTrail.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
-                  strokeColor="#3b82f6" // blue
-                  strokeWidth={4}
+              >
+                <Marker
+                  coordinate={{
+                    latitude: selectedWard.latestLocation.latitude,
+                    longitude: selectedWard.latestLocation.longitude,
+                  }}
+                  title={selectedWard.wardUser.fullName}
+                  description={selectedWard.latestLocation.isSos ? "SOS ACTIVE" : "Tracking"}
                 />
-              )}
-            </MapView>
+                {selectedWardTrail.length > 0 && (
+                  <Polyline
+                    coordinates={selectedWardTrail.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
+                    strokeColor="#3b82f6" // blue
+                    strokeWidth={4}
+                  />
+                )}
+              </MapView>
+            </View>
           ) : (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <Text style={{ color: '#6b7280' }}>Location data unavailable.</Text>
             </View>
           )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* MODAL: Active Wards List */}
+      <Modal visible={isActiveWardsModalVisible} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f6f7' }}>
+          <View style={{ padding: 22, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee' }}>
+            <View>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: '#212529' }}>Active Wards</Text>
+              <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>People currently sharing location with you</Text>
+            </View>
+            <TouchableOpacity onPress={() => setIsActiveWardsModalVisible(false)} style={{ padding: 8 }}>
+              <Text style={{ color: '#212529', fontWeight: '700' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16 }}>
+            {activeWards.length > 0 ? (
+              activeWards.map(ward => (
+                <View key={ward.connectionId} style={[styles.whiteCard, { marginBottom: 12 }]}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={[styles.iconCircleSmall, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+                      <Shield color="#ef4444" size={18} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardSectionTitle}>{ward.wardUser.fullName}</Text>
+                      <Text style={styles.cardSectionSub}>
+                        {ward.latestLocation?.isSos ? '🚨 SOS ACTIVE' : '🟢 Tracking Live'} • {ward.wardUser.batteryLevel}% Battery
+                      </Text>
+                      {ward.latestLocation && (
+                        <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                          📡 Net: {ward.latestLocation.networkType || 'WIFI'} • GPS: {ward.latestLocation.accuracyMeters < 20 ? 'Strong' : (ward.latestLocation.accuracyMeters > 50 ? 'Weak' : 'Fair')}
+                        </Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#212529', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
+                      onPress={() => {
+                        setIsActiveWardsModalVisible(false);
+                        setSelectedWard(ward);
+                        setTimeout(() => setIsMapModalVisible(true), 300);
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>View Map</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={{ padding: 32, alignItems: 'center' }}>
+                <Shield color="#d1d5db" size={48} style={{ marginBottom: 16 }} />
+                <Text style={{ color: '#6b7280', textAlign: 'center', fontWeight: '500' }}>No active wards right now. If your family turns on tracking, they will appear here.</Text>
+              </View>
+            )}
+          </ScrollView>
         </SafeAreaView>
       </Modal>
 

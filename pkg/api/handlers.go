@@ -644,3 +644,32 @@ func AdminGetStatsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, stats)
 }
+
+func AdminResolveSOSHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	if !checkAdminAuth(r) {
+		writeError(w, http.StatusUnauthorized, "Super-Admin authentication required")
+		return
+	}
+
+	var req models.ResolveSOSRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	db.ResolveSOSEvent(req.SOSEventID, req.UserID)
+	cache.ClearActiveSOS(req.UserID)
+
+	ws.GlobalHub.BroadcastMessage("SOS_RESOLVED", map[string]string{
+		"sosEventId": req.SOSEventID,
+		"userId":     req.UserID,
+		"adminResolved": "true",
+	})
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "SOS_RESOLVED_BY_ADMIN"})
+}
