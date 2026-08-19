@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Akshavi",
+    "slug": "akshavi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#030712"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.womensafety.raksha",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ],
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Raksha requires background location access to share live location with your trusted guardians during Track Me and SOS emergencies.",
+        "NSLocationWhenInUseUsageDescription": "Raksha requires location access to find your position for emergency alerts."
+      }
+    },
+    "android": {
+      "package": "com.womensafety.raksha",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "755b1095-6ddd-4411-aea3-9ff5c9b8c0fb"
+      }
+    }
+  }
+}
