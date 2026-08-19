@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Women Safety Platform — Real-Time Protection & SOS</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Top Navigation & Status -->
+  <header class="app-header">
+    <div class="logo-group">
+      <div class="shield-icon">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <div>
+        <h1>RAKSHA <span class="badge-tag">LIVE SAFETY</span></h1>
+        <p class="tagline">Sub-second emergency SOS & Real-time Live Tracking</p>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="status-indicator online" id="wsStatusIndicator">
+        <span class="pulse-dot"></span>
+        <span id="wsStatusText">Connected to Lightsail</span>
+      </div>
+      <div class="active-user-badge">
+        <i class="fa-solid fa-user-check"></i>
+        <span id="headerUserName">Priya Sharma</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dual-Screen Dashboard -->
+  <main class="dashboard-container">
+    
+    <!-- LEFT: Mobile Protected User Simulation Screen -->
+    <section class="phone-wrapper">
+      <div class="phone-frame">
+        <div class="phone-notch">
+          <div class="notch-speaker"></div>
+          <div class="notch-camera"></div>
+        </div>
+
+        <div class="phone-screen">
+          <!-- Mobile Status Bar -->
+          <div class="phone-status-bar">
+            <span class="phone-time" id="phoneTime">22:45</span>
+            <div class="phone-icons">
+              <i class="fa-solid fa-signal"></i>
+              <i class="fa-solid fa-wifi"></i>
+              <span id="phoneBatteryText"><i class="fa-solid fa-battery-three-quarters"></i> 85%</span>
+            </div>
+          </div>
+
+          <!-- Mobile App Header -->
+          <div class="mobile-app-header">
+            <div>
+              <div class="welcome-text">PROTECTION ACTIVE</div>
+              <h2 class="user-greeting" id="userGreeting">Hi, Priya</h2>
+            </div>
+            <button class="icon-btn" id="openSettingsBtn" title="Fake PIN & Safe Mode" onclick="openFakePinModal()">
+              <i class="fa-solid fa-key"></i>
+            </button>
+          </div>
+
+          <!-- Live Tracking Card -->
+          <div class="tracking-card">
+            <div class="tracking-info">
+              <div class="tracking-icon-box" id="trackingIconBox">
+                <i class="fa-solid fa-location-arrow"></i>
+              </div>
+              <div>
+                <h3>TRACK ME</h3>
+                <p id="trackingStatusSubtitle">Live sharing with 2 Trustees</p>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="trackMeToggle" checked onchange="toggleTrackMe()">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Central Big SOS Trigger Area -->
+          <div class="sos-section">
+            <div class="sos-pulse-ring" id="sosPulseRing"></div>
+            <button class="sos-button" id="sosBtn" onclick="handleSOSClick()">
+              <div class="sos-inner-content">
+                <i class="fa-solid fa-tower-broadcast"></i>
+                <span class="sos-text">SOS</span>
+                <span class="sos-subtext">TAP FOR HELP</span>
+              </div>
+            </button>
+            <p class="sos-helper-text" id="sosHelperText">Press once to notify family & start 1-sec live tracking</p>
+          </div>
+
+          <!-- Trust Groups Quick Preview -->
+          <div class="groups-section">
+            <div class="section-title-row">
+              <h4>TRUST GROUPS</h4>
+              <span class="badge-count" id="trusteeCountBadge">2 Guardians</span>
+            </div>
+            <div class="trustee-pills" id="trusteePillsList">
+              <div class="trustee-pill">
+                <i class="fa-solid fa-user-shield"></i>
+                <span>Mother (Sunita)</span>
+              </div>
+              <div class="trustee-pill">
+                <i class="fa-solid fa-user-shield"></i>
+                <span>Brother (Rahul)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobile Bottom Navigation -->
+          <div class="mobile-nav">
+            <button class="mobile-nav-item active"><i class="fa-solid fa-shield-heart"></i><span>Safety</span></button>
+            <button class="mobile-nav-item" onclick="openFakePinModal()"><i class="fa-solid fa-lock"></i><span>Fake PIN</span></button>
+            <button class="mobile-nav-item" onclick="simulateVoiceTrigger()"><i class="fa-solid fa-microphone"></i><span>Voice SOS</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">
+        <i class="fa-solid fa-mobile-screen"></i> Protected User Device (React Native / Mobile)
+      </div>
+    </section>
+
+    <!-- RIGHT: Guardian / Trustee Live Map & Emergency Operations Dashboard -->
+    <section class="trustee-dashboard">
+      
+      <!-- Emergency Active Banner (Hidden unless SOS is triggered) -->
+      <div class="emergency-banner" id="emergencyBanner" style="display: none;">
+        <div class="emergency-icon-flash">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="emergency-details">
+          <h2>EMERGENCY SOS BROADCAST ACTIVE</h2>
+          <p id="sosAlertMessage">Priya Sharma triggered an emergency alert! 1-second GPS stream active.</p>
+        </div>
+        <div class="emergency-actions">
+          <a href="tel:112" class="btn btn-police"><i class="fa-solid fa-phone-volume"></i> Police 112</a>
+          <button class="btn btn-resolve" onclick="openResolveModal()"><i class="fa-solid fa-check"></i> Resolve SOS</button>
+        </div>
+      </div>
+
+      <!-- Live Map Card -->
+      <div class="map-card">
+        <div class="map-header">
+          <div class="map-title-group">
+            <i class="fa-solid fa-satellite-dish"></i>
+            <div>
+              <h3>Guardian Live Location Stream</h3>
+              <span class="live-status-pill"><span class="pulse-green"></span> TimescaleDB Live Stream</span>
+            </div>
+          </div>
+          <div class="telemetry-badges">
+            <span class="telemetry-badge" id="speedBadge"><i class="fa-solid fa-gauge-high"></i> 0.0 km/h</span>
+            <span class="telemetry-badge" id="accuracyBadge"><i class="fa-solid fa-bullseye"></i> ±3.5m accuracy</span>
+            <span class="telemetry-badge" id="coordsBadge"><i class="fa-solid fa-location-dot"></i> 19.0760, 72.8777</span>
+          </div>
+        </div>
+
+        <!-- Interactive Leaflet Map Container -->
+        <div id="map"></div>
+
+        <!-- Simulator Toolbar (Bottom of Map) -->
+        <div class="simulator-toolbar">
+          <div class="sim-label">
+            <i class="fa-solid fa-sliders"></i>
+            <span>Local Test Controls:</span>
+          </div>
+          <button class="btn btn-sim" onclick="startMovementSimulation('walk')"><i class="fa-solid fa-person-walking"></i> Simulate Walking</button>
+          <button class="btn btn-sim" onclick="startMovementSimulation('drive')"><i class="fa-solid fa-car"></i> Simulate Driving</button>
+          <button class="btn btn-sim" onclick="stopSimulation()"><i class="fa-solid fa-pause"></i> Pause Movement</button>
+          <button class="btn btn-sim secondary" onclick="useBrowserGPS()"><i class="fa-solid fa-crosshairs"></i> Use My Real GPS</button>
+        </div>
+      </div>
+
+      <!-- Real-Time Activity Log -->
+      <div class="activity-card">
+        <div class="activity-header">
+          <h4><i class="fa-solid fa-clock-rotate-left"></i> Real-Time Telemetry & Event Stream</h4>
+          <span class="latency-pill" id="latencyPill"><i class="fa-solid fa-bolt"></i> Latency: 12ms</span>
+        </div>
+        <div class="event-feed" id="eventFeed">
+          <div class="feed-item system">
+            <span class="feed-time">Just now</span>
+            <span class="feed-text">✅ System initialized. TimescaleDB and Redis channels connected.</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- MODAL: Fake PIN / Silent Duress Test -->
+  <div class="modal-backdrop" id="fakePinModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-user-secret"></i>
+          <h3>Fake PIN (Duress Alert)</h3>
+        </div>
+        <button class="close-btn" onclick="closeFakePinModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">If forced by an attacker to unlock the phone, enter the <strong>Fake PIN</strong>. The app appears normal, but silently broadcasts an SOS to trustees.</p>
+        <div class="pin-display" id="pinDisplay">****</div>
+        <div class="keypad">
+          <button class="key-btn" onclick="pressKey('1')">1</button>
+          <button class="key-btn" onclick="pressKey('2')">2</button>
+          <button class="key-btn" onclick="pressKey('3')">3</button>
+          <button class="key-btn" onclick="pressKey('4')">4</button>
+          <button class="key-btn" onclick="pressKey('5')">5</button>
+          <button class="key-btn" onclick="pressKey('6')">6</button>
+          <button class="key-btn" onclick="pressKey('7')">7</button>
+          <button class="key-btn" onclick="pressKey('8')">8</button>
+          <button class="key-btn" onclick="pressKey('9')">9</button>
+          <button class="key-btn key-action" onclick="clearKey()">C</button>
+          <button class="key-btn" onclick="pressKey('0')">0</button>
+          <button class="key-btn key-action" onclick="submitPin()">✓</button>
+        </div>
+        <div class="pin-hint">
+          <span>Real PIN: <code>1234</code> (Normal)</span> | 
+          <span class="danger-text">Fake PIN: <code>9999</code> (Silent SOS)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Resolve SOS (Requires Real PIN) -->
+  <div class="modal-backdrop" id="resolveModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-lock"></i>
+          <h3>Deactivate SOS Emergency</h3>
+        </div>
+        <button class="close-btn" onclick="closeResolveModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Enter your <strong>Real PIN</strong> to confirm you are safe and deactivate the emergency broadcast.</p>
+        <div class="input-group">
+          <label>Enter Real PIN</label>
+          <input type="password" id="resolvePinInput" maxlength="4" placeholder="1234" class="text-input">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-resolve" onclick="submitResolveSOS()">Confirm Safe & Resolve</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

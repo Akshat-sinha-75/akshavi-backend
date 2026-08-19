@@ -1,0 +1,6 @@
+mobile
+node_modules
+.git
+.expo
+*.crdownload
+go.sum

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Akshavi Safety — Super-Admin Portal & Live Monitor</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+
+  <style>
+    :root {
+      --bg-dark: #070a13;
+      --bg-card: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-hover: #334155;
+      --accent-pink: #ec4899;
+      --accent-purple: #8b5cf6;
+      --accent-cyan: #06b6d4;
+      --sos-red: #ef4444;
+      --success-green: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+    body { background: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* Login Screen Overlay */
+    .login-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(7, 10, 19, 0.95);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.9);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .login-badge {
+      width: 56px; height: 56px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: white;
+      margin: 0 auto 6px;
+      box-shadow: 0 0 20px rgba(245,158,11,0.5);
+    }
+    .login-title { font-size: 22px; font-weight: 800; text-align: center; }
+    .login-sub { font-size: 12px; color: var(--text-muted); text-align: center; }
+    .input-box { display: flex; flex-direction: column; gap: 6px; }
+    .input-box label { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; }
+    .login-input {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+    }
+    .login-input:focus { border-color: #f59e0b; }
+    .btn-login {
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: white;
+      border: none;
+      padding: 13px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: opacity 0.2s;
+    }
+    .btn-login:hover { opacity: 0.9; }
+    .login-error { color: var(--sos-red); font-size: 12px; text-align: center; display: none; }
+
+    /* Header */
+    .admin-header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo-box { display: flex; align-items: center; gap: 12px; }
+    .crown-badge { background: linear-gradient(135deg, #f59e0b, #ef4444); width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white; box-shadow: 0 0 15px rgba(245,158,11,0.4); }
+    .logo-box h1 { font-size: 18px; font-weight: 800; }
+    .super-pill { font-size: 10px; font-weight: 800; background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 6px; border-radius: 6px; text-transform: uppercase; margin-left: 6px; }
+
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .admin-profile { display: flex; align-items: center; gap: 10px; }
+    .admin-avatar { width: 32px; height: 32px; border-radius: 50%; background: #f59e0b; color: black; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
+    .btn-logout { background: #1e293b; border: 1px solid var(--border); color: #ef4444; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .btn-logout:hover { background: #ef4444; color: white; }
+
+    /* Emergency Alert Banner */
+    .emergency-bar {
+      background: linear-gradient(90deg, #b91c1c, #dc2626);
+      padding: 12px 24px;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 0 20px rgba(239,68,68,0.5);
+      animation: pulse-sos 1s infinite alternate;
+    }
+    @keyframes pulse-sos { 0% { opacity: 0.9; } 100% { opacity: 1; } }
+    .emergency-info { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 14px; }
+
+    /* Metrics Grid */
+    .container { max-width: 1400px; width: 100%; margin: 0 auto; padding: 24px; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .stat-icon.users { background: rgba(6,182,212,0.15); color: var(--accent-cyan); }
+    .stat-icon.tracking { background: rgba(16,185,129,0.15); color: var(--success-green); }
+    .stat-icon.sos { background: rgba(239,68,68,0.15); color: var(--sos-red); }
+    .stat-val { font-size: 26px; font-weight: 900; font-family: 'JetBrains Mono', monospace; }
+    .stat-lbl { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+    /* Directory Card */
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .table-header {
+      padding: 16px 20px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .table-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .search-input {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      color: white;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      width: 280px;
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--accent-cyan); }
+
+    /* User Table */
+    .user-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+    .user-table th { background: #131d33; padding: 12px 16px; color: var(--text-muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .user-table td { padding: 14px 16px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+    .user-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .code-badge { font-family: 'JetBrains Mono', monospace; background: rgba(236,72,153,0.15); color: var(--accent-pink); border: 1px solid var(--accent-pink); padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+    .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+    .status-pill.tracking { background: rgba(16,185,129,0.15); color: var(--success-green); }
+    .status-pill.sos { background: rgba(239,68,68,0.2); color: var(--sos-red); animation: pulse-sos 0.8s infinite alternate; }
+    .status-pill.idle { background: rgba(148,163,184,0.1); color: var(--text-muted); }
+
+    .btn-inspect {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--accent-cyan);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-inspect:hover { background: var(--accent-cyan); color: #000; }
+
+    /* Modal Live Map Inspection */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 950px;
+      height: 650px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.9);
+    }
+    .modal-header {
+      padding: 14px 20px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+    .close-btn { background: transparent; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; }
+    
+    .modal-content { display: grid; grid-template-columns: 280px 1fr; flex: 1; overflow: hidden; }
+    .user-sidebar { background: #0b1120; border-right: 1px solid var(--border); padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; font-size: 13px; }
+    .profile-avatar { width: 54px; height: 54px; border-radius: 50%; background: var(--accent-pink); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: white; margin-bottom: 4px; }
+    .field-group { display: flex; flex-direction: column; gap: 2px; }
+    .field-lbl { font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+    .field-val { font-weight: 600; color: var(--text-main); }
+    
+    #adminMap { width: 100%; height: 100%; background: #1e293b; }
+  </style>
+</head>
+<body>
+
+  <!-- Super-Admin Login Overlay -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <div class="login-badge"><i class="fa-solid fa-shield-halved"></i></div>
+      <h2 class="login-title">Super-Admin Access</h2>
+      <p class="login-sub">Sign in with authorized administrator credentials</p>
+
+      <div class="input-box">
+        <label>ADMIN EMAIL</label>
+        <input type="email" id="loginEmail" class="login-input" value="akshat.sinha.0503@gmail.com" placeholder="akshat.sinha.0503@gmail.com">
+      </div>
+
+      <div class="input-box">
+        <label>PASSWORD</label>
+        <input type="password" id="loginPassword" class="login-input" value="Akshatsinha@18" placeholder="••••••••">
+      </div>
+
+      <div class="login-error" id="loginErrorMsg">Invalid email or password.</div>
+
+      <button class="btn-login" id="loginBtn" onclick="handleAdminLogin()">
+        <i class="fa-solid fa-lock-open"></i> Sign In to Portal
+      </button>
+    </div>
+  </div>
+
+  <!-- Super-Admin Top Header -->
+  <header class="admin-header">
+    <div class="logo-box">
+      <div class="crown-badge"><i class="fa-solid fa-crown"></i></div>
+      <div>
+        <h1>RAKSHA <span class="super-pill">SUPER-ADMIN</span></h1>
+        <p style="font-size: 11px; color: var(--text-muted);">Master Platform Monitor & Live GPS Inspector</p>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="admin-profile">
+        <div class="admin-avatar">AS</div>
+        <div>
+          <div style="font-size: 12px; font-weight: 800;" id="adminHeaderName">Akshat Sinha</div>
+          <div style="font-size: 10px; color: #f59e0b;">SUPER_ADMIN</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="handleAdminLogout()">
+        <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+      </button>
+    </div>
+  </header>
+
+  <!-- Emergency Flash Bar -->
+  <div class="emergency-bar" id="adminEmergencyBar">
+    <div class="emergency-info">
+      <i class="fa-solid fa-triangle-exclamation" style="font-size: 20px;"></i>
+      <span id="adminEmergencyText">🚨 CRITICAL SOS: Emergency alert active!</span>
+    </div>
+    <button class="btn-inspect" style="background: white; color: #b91c1c;" onclick="inspectFirstSOS()">View on Map</button>
+  </div>
+
+  <div class="container">
+    <!-- Stat Metrics -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon users"><i class="fa-solid fa-users"></i></div>
+        <div>
+          <div class="stat-val" id="statTotalUsers">0</div>
+          <div class="stat-lbl">Registered Users</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon tracking"><i class="fa-solid fa-location-arrow"></i></div>
+        <div>
+          <div class="stat-val" id="statTracking">0</div>
+          <div class="stat-lbl">Live Tracking Active</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon sos"><i class="fa-solid fa-tower-broadcast"></i></div>
+        <div>
+          <div class="stat-val" id="statSOS">0</div>
+          <div class="stat-lbl">Active Emergency SOS</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Directory Table -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">
+          <i class="fa-solid fa-address-book" style="color: var(--accent-cyan);"></i>
+          <span>Registered Users Master Directory</span>
+        </div>
+        <input type="text" id="userSearchInput" class="search-input" placeholder="🔍 Search by Name, Code, Phone..." oninput="filterUsers()">
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="user-table">
+          <thead>
+            <tr>
+              <th>User Name</th>
+              <th>Safety Code</th>
+              <th>Phone Number</th>
+              <th>Email</th>
+              <th>Age & Address</th>
+              <th>Guardians</th>
+              <th>Live Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody">
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading user directory...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live GPS Modal Inspector -->
+  <div class="modal-backdrop" id="inspectModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-satellite-dish" style="color: var(--accent-cyan);"></i>
+          <span id="inspectModalTitle">Inspect User Live GPS</span>
+        </div>
+        <button class="close-btn" onclick="closeInspectModal()">&times;</button>
+      </div>
+      <div class="modal-content">
+        <!-- User Sidebar -->
+        <div class="user-sidebar" id="inspectSidebar">
+          <!-- Populated dynamically -->
+        </div>
+
+        <!-- Live Map -->
+        <div id="adminMap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="admin.js?v=2"></script>
+</body>
+</html>
