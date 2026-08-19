@@ -17,31 +17,52 @@ import {
   Platform
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker, Polyline } from 'react-native-maps';
-import { Home, Shield, User, LogOut, Key, MapPin, Battery, Settings, Trash2, Edit2 } from 'lucide-react-native';
-import { api } from './src/services/api';
+import { Home, Shield, User, LogOut, Key, MapPin, Battery, Settings, Trash2, Edit2, Users, Check } from 'lucide-react-native';
+import { api, API_BASE_URL } from './src/services/api';
 import { authStorage, StoredUser } from './src/services/authStorage';
 import { startTracking, stopTracking } from './src/services/locationService';
 import AuthScreen from './src/screens/AuthScreen';
 
 const { width } = Dimensions.get('window');
 
+export interface GuardianGroup {
+  id: string;
+  name: string;
+  color: string;
+  guardianConnectionIds: string[];
+  isActive: boolean;
+}
+
+const GROUP_PRESET_COLORS = ['#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
+
 export default function App() {
   // Auth State
   const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // App State
+  // Active Screen Tab ('HOME' | 'GUARDIANS' | 'PROFILE')
   const [activeTab, setActiveTab] = useState<'HOME' | 'GUARDIANS' | 'PROFILE'>('HOME');
+
+  // Tracking & SOS State
   const [isTracking, setIsTracking] = useState(false);
   const [isSOSActive, setIsSOSActive] = useState(false);
   const [activeSOSEventId, setActiveSOSEventId] = useState<string | null>(null);
-  const [currentCoords, setCurrentCoords] = useState({ lat: 19.0760, lng: 72.8777 });
-  const [batteryLevel, setBatteryLevel] = useState(85);
+  const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [batteryLevel, setBatteryLevel] = useState<number>(100);
 
-  // Trustees & Pending Requests
+  // Trustees & Network State
   const [trustees, setTrustees] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  
+  // Guardian Groups State
+  const [guardianGroups, setGuardianGroups] = useState<GuardianGroup[]>([]);
+  const [isGroupModalVisible, setIsGroupModalVisible] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [groupNameInput, setGroupNameInput] = useState('');
+  const [groupColorInput, setGroupColorInput] = useState(GROUP_PRESET_COLORS[0]);
+  const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
   
   // Wards Map Tracking
   const [activeWards, setActiveWards] = useState<any[]>([]);
@@ -150,6 +171,153 @@ export default function App() {
     }
   }, [isSOSActive]);
 
+  const loadGuardianGroups = async (userId: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(`@akshavi_groups_${userId}`);
+      if (raw) {
+        setGuardianGroups(JSON.parse(raw));
+      } else {
+        const initialGroups: GuardianGroup[] = [
+          {
+            id: 'group-family',
+            name: 'Family',
+            color: '#3b82f6',
+            guardianConnectionIds: [],
+            isActive: false,
+          },
+          {
+            id: 'group-friends',
+            name: 'Friends',
+            color: '#ec4899',
+            guardianConnectionIds: [],
+            isActive: false,
+          }
+        ];
+        setGuardianGroups(initialGroups);
+        await AsyncStorage.setItem(`@akshavi_groups_${userId}`, JSON.stringify(initialGroups));
+      }
+    } catch (e) {}
+  };
+
+  const persistGroups = async (groups: GuardianGroup[]) => {
+    setGuardianGroups(groups);
+    if (currentUser) {
+      try {
+        await AsyncStorage.setItem(`@akshavi_groups_${currentUser.id}`, JSON.stringify(groups));
+      } catch (e) {}
+    }
+  };
+
+  const handleToggleGroup = async (groupId: string, newActive: boolean) => {
+    if (!currentUser) return;
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (e) {}
+
+    const updatedGroups = guardianGroups.map(g => (g.id === groupId ? { ...g, isActive: newActive } : g));
+    await persistGroups(updatedGroups);
+
+    const targetGroup = guardianGroups.find(g => g.id === groupId);
+    if (!targetGroup) return;
+
+    if (newActive) {
+      // Turn ON all guardians in this group
+      const connIdsToEnable = new Set(targetGroup.guardianConnectionIds);
+      setTrustees(prev =>
+        prev.map(t => (connIdsToEnable.has(t.id) ? { ...t, isSharingEnabled: true } : t))
+      );
+      for (const connId of targetGroup.guardianConnectionIds) {
+        api.toggleSharing(connId, currentUser.id, true).catch(() => {});
+      }
+    } else {
+      // Turn OFF guardians in this group, UNLESS they belong to another ACTIVE group
+      const otherActiveGroups = updatedGroups.filter(g => g.isActive && g.id !== groupId);
+      const otherActiveConnIds = new Set<string>();
+      otherActiveGroups.forEach(g => g.guardianConnectionIds.forEach(id => otherActiveConnIds.add(id)));
+
+      const connIdsToDisable = targetGroup.guardianConnectionIds.filter(id => !otherActiveConnIds.has(id));
+      const disableSet = new Set(connIdsToDisable);
+
+      setTrustees(prev =>
+        prev.map(t => (disableSet.has(t.id) ? { ...t, isSharingEnabled: false } : t))
+      );
+      for (const connId of connIdsToDisable) {
+        api.toggleSharing(connId, currentUser.id, false).catch(() => {});
+      }
+    }
+  };
+
+  const openCreateGroupModal = () => {
+    setEditingGroupId(null);
+    setGroupNameInput('');
+    setGroupColorInput(GROUP_PRESET_COLORS[0]);
+    setGroupMemberIds([]);
+    setIsGroupModalVisible(true);
+  };
+
+  const openEditGroupModal = (group: GuardianGroup) => {
+    setEditingGroupId(group.id);
+    setGroupNameInput(group.name);
+    setGroupColorInput(group.color || GROUP_PRESET_COLORS[0]);
+    setGroupMemberIds([...group.guardianConnectionIds]);
+    setIsGroupModalVisible(true);
+  };
+
+  const toggleMemberSelection = (connectionId: string) => {
+    setGroupMemberIds(prev =>
+      prev.includes(connectionId) ? prev.filter(id => id !== connectionId) : [...prev, connectionId]
+    );
+  };
+
+  const handleSaveGroup = async () => {
+    if (!groupNameInput.trim()) {
+      Alert.alert('Name Required', 'Please enter a name for the group (e.g. Family, College Friends).');
+      return;
+    }
+
+    if (editingGroupId) {
+      const updated = guardianGroups.map(g => {
+        if (g.id === editingGroupId) {
+          return {
+            ...g,
+            name: groupNameInput.trim(),
+            color: groupColorInput,
+            guardianConnectionIds: groupMemberIds,
+          };
+        }
+        return g;
+      });
+      await persistGroups(updated);
+    } else {
+      const newGroup: GuardianGroup = {
+        id: 'group_' + Date.now(),
+        name: groupNameInput.trim(),
+        color: groupColorInput,
+        guardianConnectionIds: groupMemberIds,
+        isActive: false,
+      };
+      await persistGroups([...guardianGroups, newGroup]);
+    }
+    setIsGroupModalVisible(false);
+  };
+
+  const handleDeleteGroup = async (groupId: string) => {
+    Alert.alert(
+      'Delete Group',
+      'Are you sure you want to delete this group? (Your individual guardians will not be deleted).',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const updated = guardianGroups.filter(g => g.id !== groupId);
+            await persistGroups(updated);
+            setIsGroupModalVisible(false);
+          },
+        },
+      ]
+    );
+  };
+
   const loadTrusteesData = async (userId: string) => {
     try {
       const list = await api.getMyTrustees(userId);
@@ -157,6 +325,8 @@ export default function App() {
 
       const pending = await api.getPendingRequests(userId);
       setPendingRequests(pending || []);
+
+      await loadGuardianGroups(userId);
     } catch (e) {}
   };
 
@@ -186,7 +356,7 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) return;
-    const wsUrl = api.API_BASE_URL.replace(/^http/, 'ws') + '/ws';
+    const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + '/ws';
     let socket: WebSocket | null = null;
     let reconnectTimeout: any;
 
@@ -653,11 +823,86 @@ export default function App() {
         </View>
       ) : null}
 
+      {/* 1. GUARDIAN GROUPS SECTION */}
       <View style={styles.whiteCard}>
         <View style={styles.cardHeaderRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardSectionTitle}>Trusted Guardians ({trustees.length})</Text>
-            <Text style={styles.cardSectionSub}>Toggle live access per guardian</Text>
+            <Text style={styles.cardSectionTitle}>Guardian Groups ({guardianGroups.length})</Text>
+            <Text style={styles.cardSectionSub}>1-tap toggle for multiple guardians</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addGuardianBtn}
+            onPress={openCreateGroupModal}
+          >
+            <Text style={styles.addGuardianBtnText}>+ New Group</Text>
+          </TouchableOpacity>
+        </View>
+
+        {guardianGroups.length === 0 ? (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={{ paddingVertical: 14, alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 14, marginTop: 6 }}
+            onPress={openCreateGroupModal}
+          >
+            <Users color="#9ca3af" size={24} style={{ marginBottom: 6 }} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#212529' }}>No Groups Created</Text>
+            <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2, textAlign: 'center', paddingHorizontal: 16 }}>
+              Create custom groups (e.g. Family, Late Night) to enable location sharing with multiple guardians at once.
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          guardianGroups.map(group => {
+            const memberCount = group.guardianConnectionIds.length;
+            return (
+              <View key={group.id} style={[styles.guardianRow, { backgroundColor: group.isActive ? 'rgba(59, 130, 246, 0.04)' : '#ffffff', borderRadius: 14, paddingHorizontal: 8 }]}>
+                <View style={[styles.guardianAvatarCircle, { backgroundColor: group.color + '20' }]}>
+                  <Users color={group.color} size={18} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.guardianName}>{group.name}</Text>
+                    <View style={[styles.smallCodePill, { backgroundColor: group.color + '15', borderColor: group.color }]}>
+                      <Text style={[styles.smallCodePillText, { color: group.color, fontWeight: '800' }]}>
+                        {memberCount} {memberCount === 1 ? 'Guardian' : 'Guardians'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.guardianCode}>
+                    {memberCount > 0
+                      ? trustees
+                          .filter(t => group.guardianConnectionIds.includes(t.id))
+                          .map(t => t.trusteeUser?.fullName?.split(' ')[0])
+                          .filter(Boolean)
+                          .join(', ')
+                      : 'No guardians assigned yet'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={{ padding: 8, marginRight: 4 }}
+                  onPress={() => openEditGroupModal(group)}
+                >
+                  <Edit2 color="#9ca3af" size={16} />
+                </TouchableOpacity>
+
+                <Switch
+                  value={group.isActive}
+                  onValueChange={(val) => handleToggleGroup(group.id, val)}
+                  trackColor={{ false: '#e5e7eb', true: group.color || '#fcd34d' }}
+                  thumbColor={group.isActive ? '#212529' : '#ffffff'}
+                />
+              </View>
+            );
+          })
+        )}
+      </View>
+
+      {/* 2. ALL INDIVIDUAL GUARDIANS SECTION */}
+      <View style={styles.whiteCard}>
+        <View style={styles.cardHeaderRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardSectionTitle}>All Guardians ({trustees.length})</Text>
+            <Text style={styles.cardSectionSub}>Individual sharing controls & status</Text>
           </View>
           <TouchableOpacity
             style={styles.addGuardianBtn}
@@ -674,6 +919,9 @@ export default function App() {
         ) : (
           trustees.map(t => {
             const u = t.trusteeUser;
+            // Find which groups this guardian belongs to
+            const memberOfGroups = guardianGroups.filter(g => g.guardianConnectionIds.includes(t.id));
+            
             return (
               <View key={t.id} style={styles.guardianRow}>
                 <View style={styles.guardianAvatarCircle}>
@@ -682,11 +930,16 @@ export default function App() {
                   </Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <Text style={styles.guardianName}>{u?.fullName}</Text>
                     <View style={styles.smallCodePill}>
                       <Text style={styles.smallCodePillText}>{u?.userCode}</Text>
                     </View>
+                    {memberOfGroups.map(g => (
+                      <View key={g.id} style={[styles.smallCodePill, { backgroundColor: g.color + '15', borderColor: g.color }]}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: g.color }}>{g.name}</Text>
+                      </View>
+                    ))}
                   </View>
                   <Text style={styles.guardianCode}>{u?.phoneNumber}</Text>
                 </View>
@@ -855,6 +1108,112 @@ export default function App() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* MODAL: Create / Edit Guardian Group */}
+      <Modal visible={isGroupModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.cleanModalCard, { maxHeight: '85%', paddingBottom: 16 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={styles.modalHeading}>{editingGroupId ? 'Edit Group' : 'New Guardian Group'}</Text>
+              {editingGroupId && (
+                <TouchableOpacity onPress={() => handleDeleteGroup(editingGroupId)} style={{ padding: 6 }}>
+                  <Trash2 color="#ef4444" size={18} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.inputLabel}>GROUP NAME</Text>
+              <TextInput
+                style={styles.modalInputField}
+                placeholder="e.g. Family, College Friends"
+                placeholderTextColor="#9ca3af"
+                value={groupNameInput}
+                onChangeText={setGroupNameInput}
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: 4 }]}>THEME COLOR</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
+                {GROUP_PRESET_COLORS.map(color => (
+                  <TouchableOpacity
+                    key={color}
+                    onPress={() => setGroupColorInput(color)}
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      backgroundColor: color,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: groupColorInput === color ? 3 : 0,
+                      borderColor: '#212529',
+                    }}
+                  >
+                    {groupColorInput === color && <Check color="#fff" size={16} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.inputLabel}>SELECT GUARDIANS FOR THIS GROUP</Text>
+              {trustees.length === 0 ? (
+                <Text style={{ fontSize: 12, color: '#9ca3af', marginBottom: 16 }}>
+                  No guardians connected yet. Pair guardians first using their Safety Code.
+                </Text>
+              ) : (
+                <View style={{ gap: 8, marginBottom: 20 }}>
+                  {trustees.map(t => {
+                    const isSelected = groupMemberIds.includes(t.id);
+                    const u = t.trusteeUser;
+                    return (
+                      <TouchableOpacity
+                        key={t.id}
+                        activeOpacity={0.7}
+                        onPress={() => toggleMemberSelection(t.id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          padding: 12,
+                          borderRadius: 14,
+                          backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.08)' : '#f9fafb',
+                          borderWidth: 1,
+                          borderColor: isSelected ? '#3b82f6' : '#e5e7eb',
+                        }}
+                      >
+                        <View style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 6,
+                          backgroundColor: isSelected ? '#3b82f6' : '#ffffff',
+                          borderWidth: 1.5,
+                          borderColor: isSelected ? '#3b82f6' : '#d1d5db',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginRight: 10,
+                        }}>
+                          {isSelected && <Check color="#fff" size={14} />}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#212529' }}>{u?.fullName}</Text>
+                          <Text style={{ fontSize: 11, color: '#6b7280' }}>{u?.userCode} • {u?.phoneNumber}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsGroupModalVisible(false)}>
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveGroup}>
+                <Text style={styles.modalConfirmBtnText}>{editingGroupId ? 'Save Changes' : 'Create Group'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* MODAL: Add Guardian */}
       <Modal visible={addTrusteeModalVisible} transparent animationType="fade">
