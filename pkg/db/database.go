@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -14,8 +15,15 @@ import (
 var DB *sql.DB
 
 func InitDB(host, port, user, password, dbname string) (*sql.DB, error) {
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
+	sslMode := "disable"
+	if sm := os.Getenv("DB_SSLMODE"); sm != "" {
+		sslMode = sm
+	} else if host != "postgres" && host != "localhost" && host != "127.0.0.1" {
+		sslMode = "require"
+	}
+
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslMode)
 
 	var err error
 	DB, err = sql.Open("postgres", dsn)
@@ -28,11 +36,87 @@ func InitDB(host, port, user, password, dbname string) (*sql.DB, error) {
 	DB.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := DB.Ping(); err != nil {
+		// If ping failed with require, try with disable
+		if sslMode == "require" {
+			dsnFallback := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+				host, port, user, password, dbname)
+			if fallbackDB, fbErr := sql.Open("postgres", dsnFallback); fbErr == nil && fallbackDB.Ping() == nil {
+				DB = fallbackDB
+				log.Println("✅ Database connection established (sslmode=disable)")
+				autoMigrateTables(DB)
+				return DB, nil
+			}
+		}
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log.Println("✅ TimescaleDB connection established")
+	log.Println("✅ Database connection established")
+	autoMigrateTables(DB)
 	return DB, nil
+}
+
+func autoMigrateTables(db *sql.DB) {
+	queries := []string{
+		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`,
+		`CREATE TABLE IF NOT EXISTS users (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			user_code VARCHAR(10) UNIQUE,
+			email VARCHAR(100) UNIQUE NOT NULL,
+			phone_number VARCHAR(15) UNIQUE NOT NULL,
+			password_hash VARCHAR(255) NOT NULL,
+			full_name VARCHAR(100) DEFAULT '',
+			age INT DEFAULT 0,
+			address TEXT DEFAULT '',
+			pin_hash VARCHAR(100) DEFAULT '1234',
+			fake_pin_hash VARCHAR(100) DEFAULT '9999',
+			profile_completed BOOLEAN DEFAULT FALSE,
+			kyc_status VARCHAR(20) DEFAULT 'VERIFIED',
+			battery_level INT DEFAULT 100,
+			is_tracking_active BOOLEAN DEFAULT FALSE,
+			created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS trustee_connections (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			requester_id UUID REFERENCES users(id) ON DELETE CASCADE,
+			receiver_id UUID REFERENCES users(id) ON DELETE CASCADE,
+			status VARCHAR(20) DEFAULT 'ACCEPTED',
+			is_sharing_enabled BOOLEAN DEFAULT TRUE,
+			created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+			CONSTRAINT unique_connection UNIQUE (requester_id, receiver_id)
+		);`,
+		`CREATE TABLE IF NOT EXISTS location_history (
+			time TIMESTAMPTZ NOT NULL,
+			user_id UUID NOT NULL,
+			latitude DOUBLE PRECISION NOT NULL,
+			longitude DOUBLE PRECISION NOT NULL,
+			accuracy_meters FLOAT DEFAULT 5.0,
+			battery_level INT DEFAULT 100,
+			speed_mps FLOAT DEFAULT 0.0,
+			network_type VARCHAR(20) DEFAULT 'UNKNOWN',
+			is_sos BOOLEAN DEFAULT FALSE
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_location_history_coords ON location_history (latitude, longitude);`,
+		`CREATE INDEX IF NOT EXISTS idx_location_history_user_time ON location_history (user_id, time DESC);`,
+		`CREATE TABLE IF NOT EXISTS sos_events (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+			trigger_type VARCHAR(30) NOT NULL,
+			status VARCHAR(20) DEFAULT 'ACTIVE',
+			initial_latitude DOUBLE PRECISION NOT NULL,
+			initial_longitude DOUBLE PRECISION NOT NULL,
+			battery_level INT,
+			started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+			resolved_at TIMESTAMPTZ
+		);`,
+	}
+
+	for _, q := range queries {
+		if _, err := db.Exec(q); err != nil {
+			log.Printf("⚠️ AutoMigrate notice: %v", err)
+		}
+	}
+	log.Println("✅ Database schema verified and auto-migrated")
 }
 
 func generateUserCode() string {

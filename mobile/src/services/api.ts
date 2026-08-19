@@ -1,11 +1,8 @@
 import { Platform } from 'react-native';
 
-// Auto-detect base URL: If running in web browser on PC -> use localhost:8080. If on mobile phone -> use Wi-Fi IP.
+// Production cloud URL on Render
 function getDefaultApiUrl(): string {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
-    return `http://${window.location.hostname}:8080`;
-  }
-  return 'http://10.116.105.206:8080';
+  return 'https://akshavi-backend.onrender.com';
 }
 
 export let API_BASE_URL = getDefaultApiUrl();
