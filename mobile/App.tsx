@@ -65,9 +65,43 @@ export default function App() {
   const [editAddress, setEditAddress] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
-  // Pulse animation for active SOS
+  // Pulse animation for active SOS & Beating Map Marker
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const markerPulseAnim = useRef(new Animated.Value(1)).current;
+  const markerPulseOpacity = useRef(new Animated.Value(0.8)).current;
+
+  // Continuous beating pulse for map dot
+  useEffect(() => {
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(markerPulseAnim, {
+            toValue: 1.8,
+            duration: 1300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(markerPulseAnim, {
+            toValue: 1,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(markerPulseOpacity, {
+            toValue: 0,
+            duration: 1300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(markerPulseOpacity, {
+            toValue: 0.8,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    ).start();
+  }, []);
 
   // Load saved session on mount
   useEffect(() => {
@@ -145,6 +179,135 @@ export default function App() {
     setEditAddress(user.address);
     loadTrusteesData(user.id);
   };
+
+  // Real-time WebSocket Guardian Alerts & Notifications
+  const notifiedTrackingUsers = useRef<Set<string>>(new Set());
+  const activeSOSAlerts = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const wsUrl = api.API_BASE_URL.replace(/^http/, 'ws') + '/ws';
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: any;
+
+    const connectWs = () => {
+      try {
+        socket = new WebSocket(wsUrl);
+
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            // 1. SOS Triggered Emergency Notification
+            if (data.type === 'SOS_TRIGGERED') {
+              const sosEvt = data.payload;
+              if (sosEvt && sosEvt.userId !== currentUser.id) {
+                const wardName = sosEvt.user?.fullName || 'Your ward';
+                
+                // Strong emergency vibration
+                try {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                } catch (e) {}
+
+                activeSOSAlerts.current.add(sosEvt.userId);
+                
+                Alert.alert(
+                  '🚨 CRITICAL EMERGENCY SOS',
+                  `⚠️ ${wardName} is in EMERGENCY! SOS Distress Alert Active.`,
+                  [
+                    {
+                      text: 'Track Now',
+                      onPress: () => {
+                        setIsActiveWardsModalVisible(true);
+                      },
+                    },
+                    { text: 'Dismiss', style: 'cancel' },
+                  ]
+                );
+
+                api.getActiveWards(currentUser.id).then(wards => {
+                  if (wards) setActiveWards(wards);
+                });
+              }
+            }
+            
+            // 2. Track Me Location Sharing Notification
+            else if (data.type === 'LOCATION_UPDATE') {
+              const lp = data.payload;
+              const senderId = lp.userId || lp.user_id;
+              if (senderId && senderId !== currentUser.id) {
+                // Fetch wards to check if this user is a ward
+                api.getActiveWards(currentUser.id).then(wards => {
+                  if (wards && wards.length > 0) {
+                    setActiveWards(wards);
+                    const ward = wards.find(w => w.wardUser.id === senderId);
+                    if (ward && !notifiedTrackingUsers.current.has(senderId)) {
+                      notifiedTrackingUsers.current.add(senderId);
+                      try {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      } catch (e) {}
+
+                      Alert.alert(
+                        '📍 Live Tracking Started',
+                        `${ward.wardUser.fullName} has shared location with you. Track it!`,
+                        [
+                          {
+                            text: 'View Map',
+                            onPress: () => {
+                              setSelectedWard(ward);
+                              setIsActiveWardsModalVisible(false);
+                              setTimeout(() => setIsMapModalVisible(true), 300);
+                            },
+                          },
+                          { text: 'OK', style: 'default' },
+                        ]
+                      );
+                    }
+                  }
+                });
+              }
+            }
+
+            // 3. SOS Resolved Notification
+            else if (data.type === 'SOS_RESOLVED') {
+              const payload = data.payload;
+              const senderId = payload.userId;
+              if (senderId && senderId !== currentUser.id) {
+                activeSOSAlerts.current.delete(senderId);
+                notifiedTrackingUsers.current.delete(senderId);
+                api.getActiveWards(currentUser.id).then(wards => {
+                  if (wards) setActiveWards(wards);
+                });
+              }
+            }
+
+            // 4. Tracking Stopped
+            else if (data.type === 'TRACKING_STOPPED') {
+              const payload = data.payload;
+              if (payload && payload.userId) {
+                notifiedTrackingUsers.current.delete(payload.userId);
+                api.getActiveWards(currentUser.id).then(wards => {
+                  if (wards) setActiveWards(wards);
+                });
+              }
+            }
+          } catch (err) {}
+        };
+
+        socket.onerror = () => {};
+        socket.onclose = () => {
+          reconnectTimeout = setTimeout(connectWs, 4000);
+        };
+      } catch (err) {}
+    };
+
+    connectWs();
+
+    return () => {
+      if (socket) socket.close();
+      clearTimeout(reconnectTimeout);
+    };
+  }, [currentUser]);
 
   // Poll Active Wards
   useEffect(() => {
@@ -809,9 +972,51 @@ export default function App() {
                     latitude: selectedWard.latestLocation.latitude,
                     longitude: selectedWard.latestLocation.longitude,
                   }}
-                  title={selectedWard.wardUser.fullName}
-                  description={selectedWard.latestLocation.isSos ? "SOS ACTIVE" : "Tracking"}
-                />
+                  anchor={{ x: 0.5, y: 0.5 }}
+                >
+                  <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                    {/* Animated outer pulsing radar ripple */}
+                    <Animated.View
+                      style={{
+                        position: 'absolute',
+                        width: 38,
+                        height: 38,
+                        borderRadius: 19,
+                        backgroundColor: selectedWard.latestLocation.isSos ? 'rgba(239, 68, 68, 0.28)' : 'rgba(37, 99, 235, 0.28)',
+                        borderWidth: 1.5,
+                        borderColor: selectedWard.latestLocation.isSos ? '#ef4444' : '#3b82f6',
+                        transform: [{ scale: markerPulseAnim }],
+                        opacity: markerPulseOpacity,
+                      }}
+                    />
+                    {/* Inner glowing halo */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        backgroundColor: selectedWard.latestLocation.isSos ? 'rgba(239, 68, 68, 0.35)' : 'rgba(59, 130, 246, 0.35)',
+                      }}
+                    />
+                    {/* Center solid beating dot */}
+                    <View
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 7,
+                        backgroundColor: selectedWard.latestLocation.isSos ? '#ef4444' : '#2563eb',
+                        borderWidth: 2.5,
+                        borderColor: '#ffffff',
+                        shadowColor: selectedWard.latestLocation.isSos ? '#ef4444' : '#1d4ed8',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.8,
+                        shadowRadius: 3,
+                        elevation: 5,
+                      }}
+                    />
+                  </View>
+                </Marker>
                 {selectedWardTrail.length > 0 && (
                   <Polyline
                     coordinates={selectedWardTrail.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}

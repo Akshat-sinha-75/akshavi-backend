@@ -451,6 +451,7 @@ func StopTrackingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	cache.ClearTrail(userId)
+	ws.GlobalHub.BroadcastMessage("TRACKING_STOPPED", map[string]string{"userId": userId})
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Tracking stopped"})
 }
