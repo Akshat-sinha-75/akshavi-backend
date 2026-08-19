@@ -17,6 +17,7 @@ import {
   Platform
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as Updates from 'expo-updates';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Home, Shield, User, LogOut, Key, MapPin, Battery, Settings, Trash2, Edit2, Users, Check } from 'lucide-react-native';
@@ -138,6 +139,31 @@ export default function App() {
       setIsAuthLoading(false);
     }
     checkAuth();
+
+    // Check for Over-The-Air (OTA) Updates on real builds
+    async function checkForUpdates() {
+      if (__DEV__) return;
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          Alert.alert(
+            '🚀 Update Ready',
+            'A new update with latest features and improvements has been downloaded. Restart now to apply?',
+            [
+              { text: 'Later', style: 'cancel' },
+              {
+                text: 'Restart & Apply',
+                onPress: async () => {
+                  await Updates.reloadAsync();
+                },
+              },
+            ]
+          );
+        }
+      } catch (e) {}
+    }
+    checkForUpdates();
   }, []);
 
   useEffect(() => {
