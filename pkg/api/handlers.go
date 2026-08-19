@@ -389,6 +389,7 @@ func TrackLocationHandler(w http.ResponseWriter, r *http.Request) {
 
 	db.InsertLocation(&lp)
 	cache.SetLatestLocation(&lp)
+	cache.AppendToTrail(&lp)
 	db.UpdateUserStatus(lp.UserID, lp.BatteryLevel, true)
 
 	// Real-time broadcast to Admin and Guardians
@@ -448,8 +449,29 @@ func StopTrackingHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Failed to stop tracking")
 		return
 	}
+	
+	cache.ClearTrail(userId)
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Tracking stopped"})
+}
+
+func GetLiveTrailHandler(w http.ResponseWriter, r *http.Request) {
+	userId := strings.TrimPrefix(r.URL.Path, "/api/location/trail/")
+	if userId == "" || userId == r.URL.Path {
+		writeError(w, http.StatusBadRequest, "User ID required")
+		return
+	}
+
+	trail, err := cache.GetTrail(userId)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if trail == nil {
+		trail = []models.LocationPoint{}
+	}
+	writeJSON(w, http.StatusOK, trail)
 }
 
 // 4. Emergency SOS Handlers

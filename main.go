@@ -125,6 +125,7 @@ func main() {
 	// 3. Location Ingest & Real-Time Tracking
 	mux.HandleFunc("/api/location/track", api.TrackLocationHandler)
 	mux.HandleFunc("/api/location/history/", api.LocationHistoryHandler)
+	mux.HandleFunc("/api/location/trail/", api.GetLiveTrailHandler)
 	mux.HandleFunc("/api/location/stop/", api.StopTrackingHandler)
 
 	// 4. Emergency SOS Handlers

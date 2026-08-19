@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS location_history (
     accuracy_meters FLOAT DEFAULT 5.0,
     battery_level INT DEFAULT 100,
     speed_mps FLOAT DEFAULT 0.0,
+    network_type VARCHAR(20) DEFAULT 'UNKNOWN',
     is_sos BOOLEAN DEFAULT FALSE
 );
 

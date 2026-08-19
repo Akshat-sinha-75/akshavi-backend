@@ -249,9 +249,9 @@ func StopUserTracking(userId string) error {
 }
 
 func InsertLocation(lp *models.LocationPoint) error {
-	query := `INSERT INTO location_history (time, user_id, latitude, longitude, accuracy_meters, battery_level, speed_mps, is_sos)
-	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
-	_, err := DB.Exec(query, lp.Time, lp.UserID, lp.Latitude, lp.Longitude, lp.AccuracyMeters, lp.BatteryLevel, lp.SpeedMPS, lp.IsSOS)
+	query := `INSERT INTO location_history (time, user_id, latitude, longitude, accuracy_meters, battery_level, speed_mps, network_type, is_sos)
+	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+	_, err := DB.Exec(query, lp.Time, lp.UserID, lp.Latitude, lp.Longitude, lp.AccuracyMeters, lp.BatteryLevel, lp.SpeedMPS, lp.NetworkType, lp.IsSOS)
 	return err
 }
 

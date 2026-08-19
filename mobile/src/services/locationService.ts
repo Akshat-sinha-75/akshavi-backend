@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import * as Battery from 'expo-battery';
+import * as Network from 'expo-network';
 import { api } from './api';
 
 let lastSentLat = 0;
@@ -52,6 +53,12 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
         batteryLevel: 85,
       });
 
+      let netType = 'UNKNOWN';
+      try {
+        const n = await Network.getNetworkStateAsync();
+        netType = n.type?.toString() || 'UNKNOWN';
+      } catch (e) {}
+
       api.trackLocation({
         userId,
         latitude: initialPos.coords.latitude,
@@ -59,6 +66,7 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
         accuracyMeters: initialPos.coords.accuracy || 5,
         batteryLevel: 85,
         speedMPS: initialPos.coords.speed || 0,
+        networkType: netType,
       });
     }
   } catch (e) {}
@@ -86,6 +94,12 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
           if (level > 0) batteryLevel = Math.round(level * 100);
         } catch (e) {}
 
+        let networkType = 'UNKNOWN';
+        try {
+          const net = await Network.getNetworkStateAsync();
+          networkType = net.type?.toString() || 'UNKNOWN';
+        } catch (e) {}
+
         // Always update UI with real phone GPS
         if (onLocation) {
           onLocation({ latitude: lat, longitude: lng, speed, batteryLevel });
@@ -106,6 +120,7 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
             accuracyMeters: accuracy,
             batteryLevel,
             speedMPS: speed,
+            networkType,
           });
         }
       }

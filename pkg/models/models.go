@@ -100,6 +100,7 @@ type LocationPoint struct {
 	AccuracyMeters float64   `json:"accuracyMeters"`
 	BatteryLevel   int       `json:"batteryLevel"`
 	SpeedMPS       float64   `json:"speedMPS"`
+	NetworkType    string    `json:"networkType"`
 	IsSOS          bool      `json:"isSos"`
 }
 

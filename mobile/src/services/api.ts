@@ -5,7 +5,7 @@ function getDefaultApiUrl(): string {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
     return `http://${window.location.hostname}:8080`;
   }
-  return 'http://172.26.33.3:8080';
+  return 'http://10.116.105.206:8080';
 }
 
 export let API_BASE_URL = getDefaultApiUrl();
@@ -21,6 +21,7 @@ export interface LocationPayload {
   accuracyMeters: number;
   batteryLevel: number;
   speedMPS: number;
+  networkType: string;
 }
 
 export interface SOSPayload {
@@ -175,6 +176,19 @@ export const api = {
   async getActiveWards(userId: string) {
     try {
       const response = await fetchWithTimeout(`${API_BASE_URL}/api/trustees/wards/active?userId=${userId}`, {}, 4000);
+      if (response.ok) {
+        const data = await response.json();
+        return data || [];
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async getLiveTrail(wardId: string) {
+    try {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/api/location/trail/${wardId}`, {}, 4000);
       if (response.ok) {
         const data = await response.json();
         return data || [];

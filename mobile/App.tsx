@@ -17,7 +17,7 @@ import {
   Platform
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Home, Shield, User, LogOut, Key, MapPin, Battery, Settings, Trash2, Edit2 } from 'lucide-react-native';
 import { api } from './src/services/api';
 import { authStorage, StoredUser } from './src/services/authStorage';
@@ -55,6 +55,7 @@ export default function App() {
   const [targetIdentifier, setTargetIdentifier] = useState('');
   const [pinInput, setPinInput] = useState('');
   const [resolvePinInput, setResolvePinInput] = useState('');
+  const [selectedWardTrail, setSelectedWardTrail] = useState<any[]>([]);
   
   // Edit Profile State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -144,6 +145,22 @@ export default function App() {
     loadTrusteesData(user.id);
   };
 
+  // Poll Active Wards
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (currentUser) {
+      const fetchWards = async () => {
+        const wards = await api.getActiveWards(currentUser.id);
+        if (wards) setActiveWards(wards);
+      };
+      fetchWards();
+      interval = setInterval(fetchWards, 5000);
+    } else {
+      setActiveWards([]);
+    }
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   const handleLogout = async () => {
     await authStorage.clearAuth();
     setCurrentUser(null);
@@ -170,6 +187,24 @@ export default function App() {
 
     await api.toggleSharing(connectionId, currentUser.id, newVal);
   };
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isMapModalVisible && selectedWard) {
+      // Fetch immediately
+      api.getLiveTrail(selectedWard.wardUser.id).then(trail => {
+        if (trail) setSelectedWardTrail(trail);
+      });
+      // Then poll every 5s
+      interval = setInterval(async () => {
+        const trail = await api.getLiveTrail(selectedWard.wardUser.id);
+        if (trail) setSelectedWardTrail(trail);
+      }, 5000);
+    } else {
+      setSelectedWardTrail([]);
+    }
+    return () => clearInterval(interval);
+  }, [isMapModalVisible, selectedWard]);
 
   const handleSendTrusteeRequest = async () => {
     if (!targetIdentifier.trim() || !currentUser) {
@@ -379,16 +414,17 @@ export default function App() {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Live GPS Broadcast Session Switch Card */}
+      {/* Unified Status Hub */}
       <View style={styles.whiteCard}>
-        <View style={styles.cardHeaderRow}>
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -6 }}>Active Systems</Text>
+        <View style={[styles.cardHeaderRow, { borderBottomWidth: 1, borderColor: '#f3f4f6', paddingBottom: 12 }]}>
           <View style={styles.iconCircleSmall}>
             <MapPin color="#212529" size={18} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardSectionTitle}>Track Me (Live GPS)</Text>
             <Text style={styles.cardSectionSub}>
-              {isTracking ? `Broadcasting to ${activeSharingCount} of ${trustees.length} Guardians` : 'Location sharing paused'}
+              {isTracking ? `Broadcasting to ${activeSharingCount} Guardians` : 'Location sharing paused'}
             </Text>
           </View>
           <Switch
@@ -398,19 +434,19 @@ export default function App() {
             thumbColor={isTracking ? '#212529' : '#ffffff'}
           />
         </View>
-      </View>
 
-      {/* Telemetry Status Bar */}
-      <View style={styles.telemetryContainer}>
-        <View style={styles.telemetryPill}>
-          <Battery color="#6b7280" size={14} style={{ marginRight: 4 }} />
-          <Text style={styles.telemetryPillText}>{batteryLevel}% Power</Text>
-        </View>
-        <View style={styles.telemetryPill}>
-          <MapPin color="#6b7280" size={14} style={{ marginRight: 4 }} />
-          <Text style={styles.telemetryPillText}>
-            {currentCoords.lat.toFixed(4)}, {currentCoords.lng.toFixed(4)}
-          </Text>
+        {/* Telemetry Row Inside Hub */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={[styles.telemetryPill, { flex: 1, backgroundColor: '#f9fafb', borderWidth: 0 }]}>
+            <Battery color="#6b7280" size={14} style={{ marginRight: 6 }} />
+            <Text style={styles.telemetryPillText}>{batteryLevel}% Power</Text>
+          </View>
+          <View style={[styles.telemetryPill, { flex: 1.5, backgroundColor: '#f9fafb', borderWidth: 0 }]}>
+            <MapPin color="#6b7280" size={14} style={{ marginRight: 6 }} />
+            <Text style={styles.telemetryPillText}>
+              {currentCoords.lat.toFixed(4)}, {currentCoords.lng.toFixed(4)}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -429,6 +465,11 @@ export default function App() {
                   <Text style={styles.cardSectionSub}>
                     {ward.latestLocation?.isSos ? '🚨 SOS ACTIVE' : '🟢 Tracking Live'} • {ward.wardUser.batteryLevel}% Battery
                   </Text>
+                  {ward.latestLocation && (
+                    <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                      📡 Network: {ward.latestLocation.networkType || 'WIFI'} • GPS: {ward.latestLocation.accuracyMeters < 20 ? 'Strong' : (ward.latestLocation.accuracyMeters > 50 ? 'Weak' : 'Fair')}
+                    </Text>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={{ backgroundColor: '#212529', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}
@@ -571,19 +612,34 @@ export default function App() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={{ gap: 12 }}>
-            <View>
-              <Text style={styles.inputLabel}>Full Name</Text>
-              <Text style={styles.profileTextValue}>{currentUser.fullName}</Text>
+          <View style={{ gap: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={[styles.iconCircleSmall, { backgroundColor: 'rgba(252, 211, 77, 0.2)' }]}>
+                <User color="#b45309" size={18} />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <Text style={styles.profileTextValue}>{currentUser.fullName}</Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.inputLabel}>Email & Phone</Text>
-              <Text style={styles.profileTextValue}>{currentUser.email}</Text>
-              <Text style={styles.profileTextValue}>{currentUser.phoneNumber}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={[styles.iconCircleSmall, { backgroundColor: 'rgba(252, 211, 77, 0.2)' }]}>
+                <Shield color="#b45309" size={18} />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Email & Phone</Text>
+                <Text style={styles.profileTextValue}>{currentUser.email}</Text>
+                <Text style={styles.profileTextValue}>{currentUser.phoneNumber}</Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.inputLabel}>Age & Address</Text>
-              <Text style={styles.profileTextValue}>{currentUser.age} yrs • {currentUser.address}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={[styles.iconCircleSmall, { backgroundColor: 'rgba(252, 211, 77, 0.2)' }]}>
+                <MapPin color="#b45309" size={18} />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Age & Address</Text>
+                <Text style={styles.profileTextValue}>{currentUser.age} yrs • {currentUser.address}</Text>
+              </View>
             </View>
           </View>
         )}
@@ -774,7 +830,7 @@ export default function App() {
           </View>
           {selectedWard?.latestLocation ? (
             <MapView
-              style={{ flex: 1 }}
+              style={{ width: '100%', height: '100%' }}
               region={{
                 latitude: selectedWard.latestLocation.latitude,
                 longitude: selectedWard.latestLocation.longitude,
@@ -790,6 +846,13 @@ export default function App() {
                 title={selectedWard.wardUser.fullName}
                 description={selectedWard.latestLocation.isSos ? "SOS ACTIVE" : "Tracking"}
               />
+              {selectedWardTrail.length > 0 && (
+                <Polyline
+                  coordinates={selectedWardTrail.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
+                  strokeColor="#3b82f6" // blue
+                  strokeWidth={4}
+                />
+              )}
             </MapView>
           ) : (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -965,18 +1028,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   whiteCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderColor: '#f3f4f6',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0.05,
     shadowRadius: 10,
-    elevation: 2,
+    elevation: 3,
     gap: 14,
-    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(20px)' } as any : {}),
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -1137,10 +1199,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   cleanInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: '#f3f4f6',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderColor: '#e5e7eb',
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 15,

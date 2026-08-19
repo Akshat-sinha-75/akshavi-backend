@@ -84,6 +84,47 @@ func GetLatestLocation(userId string) (*models.LocationPoint, error) {
 	return &lp, nil
 }
 
+// Live Trail Caching
+func AppendToTrail(lp *models.LocationPoint) error {
+	data, err := json.Marshal(lp)
+	if err != nil {
+		return err
+	}
+	key := fmt.Sprintf("loc:trail:%s", lp.UserID)
+	
+	pipe := RDB.Pipeline()
+	pipe.LPush(Ctx, key, data)
+	pipe.LTrim(Ctx, key, 0, 999) // Keep only the latest 1000 points
+	pipe.Expire(Ctx, key, 24*time.Hour)
+	_, err = pipe.Exec(Ctx)
+	return err
+}
+
+func GetTrail(userId string) ([]models.LocationPoint, error) {
+	key := fmt.Sprintf("loc:trail:%s", userId)
+	vals, err := RDB.LRange(Ctx, key, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+	
+	var trail []models.LocationPoint
+	for _, val := range vals {
+		var lp models.LocationPoint
+		if err := json.Unmarshal([]byte(val), &lp); err == nil {
+			trail = append(trail, lp)
+		}
+	}
+	// LRange returns elements from head to tail (newest to oldest because of LPush)
+	// We might want to reverse them or leave them. Usually clients draw from oldest to newest.
+	// But let's just return what we have, the frontend can handle it.
+	return trail, nil
+}
+
+func ClearTrail(userId string) error {
+	key := fmt.Sprintf("loc:trail:%s", userId)
+	return RDB.Del(Ctx, key).Err()
+}
+
 // OTP Caching
 func StoreOTP(identifier string, otp string) error {
 	key := fmt.Sprintf("otp:%s", identifier)
