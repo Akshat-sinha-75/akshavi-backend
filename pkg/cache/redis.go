@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -15,6 +16,22 @@ var RDB *redis.Client
 var Ctx = context.Background()
 
 func InitRedis(host, port string) (*redis.Client, error) {
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = os.Getenv("REDIS_INTERNAL_URL")
+	}
+
+	if redisURL != "" {
+		opt, err := redis.ParseURL(redisURL)
+		if err == nil {
+			RDB = redis.NewClient(opt)
+			if err := RDB.Ping(Ctx).Err(); err == nil {
+				log.Println("✅ Redis cache connection established via REDIS_URL")
+				return RDB, nil
+			}
+		}
+	}
+
 	RDB = redis.NewClient(&redis.Options{
 		Addr:         fmt.Sprintf("%s:%s", host, port),
 		Password:     "",
