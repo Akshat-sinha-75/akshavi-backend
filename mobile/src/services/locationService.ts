@@ -46,12 +46,11 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
       accuracy: Location.Accuracy.Balanced,
     });
     if (initialPos && onLocation) {
-      onLocation({
-        latitude: initialPos.coords.latitude,
-        longitude: initialPos.coords.longitude,
-        speed: initialPos.coords.speed || 0,
-        batteryLevel: 85,
-      });
+      let initialBattery = 100;
+      try {
+        const b = await Battery.getBatteryLevelAsync();
+        if (b >= 0) initialBattery = Math.round(b * 100);
+      } catch (e) {}
 
       let netType = 'UNKNOWN';
       try {
@@ -59,12 +58,19 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
         netType = n.type?.toString() || 'UNKNOWN';
       } catch (e) {}
 
+      onLocation({
+        latitude: initialPos.coords.latitude,
+        longitude: initialPos.coords.longitude,
+        speed: initialPos.coords.speed || 0,
+        batteryLevel: initialBattery,
+      });
+
       api.trackLocation({
         userId,
         latitude: initialPos.coords.latitude,
         longitude: initialPos.coords.longitude,
         accuracyMeters: initialPos.coords.accuracy || 5,
-        batteryLevel: 85,
+        batteryLevel: initialBattery,
         speedMPS: initialPos.coords.speed || 0,
         networkType: netType,
       });
@@ -88,10 +94,10 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
         const speed = location.coords.speed || 0;
         const accuracy = location.coords.accuracy || 5;
 
-        let batteryLevel = 85;
+        let batteryLevel = 100;
         try {
           const level = await Battery.getBatteryLevelAsync();
-          if (level > 0) batteryLevel = Math.round(level * 100);
+          if (level >= 0) batteryLevel = Math.round(level * 100);
         } catch (e) {}
 
         let networkType = 'UNKNOWN';

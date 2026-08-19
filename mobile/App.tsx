@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Updates from 'expo-updates';
+import * as ExpoBattery from 'expo-battery';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Home, Shield, User, LogOut, Key, MapPin, Battery, Settings, Trash2, Edit2, Users, Check } from 'lucide-react-native';
@@ -123,6 +124,32 @@ export default function App() {
         ]),
       ])
     ).start();
+  }, []);
+
+  // Real-time Phone Battery Level Listener
+  useEffect(() => {
+    async function initBattery() {
+      try {
+        const level = await ExpoBattery.getBatteryLevelAsync();
+        if (level >= 0) {
+          setBatteryLevel(Math.round(level * 100));
+        }
+      } catch (e) {}
+    }
+    initBattery();
+
+    let sub: any;
+    try {
+      sub = ExpoBattery.addBatteryLevelListener(({ batteryLevel: lvl }) => {
+        if (lvl >= 0) {
+          setBatteryLevel(Math.round(lvl * 100));
+        }
+      });
+    } catch (e) {}
+
+    return () => {
+      if (sub && sub.remove) sub.remove();
+    };
   }, []);
 
   // Load saved session on mount

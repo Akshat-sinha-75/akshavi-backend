@@ -218,6 +218,31 @@ func SendConnectionRequest(requesterId, targetIdentifier string) (*models.Truste
 		return nil, fmt.Errorf("you cannot add yourself as a guardian")
 	}
 
+	// 1. Check if connection already exists in either direction
+	var existing models.TrusteeConnection
+	checkQuery := `SELECT id, requester_id, receiver_id, status, is_sharing_enabled, created_at 
+	               FROM trustee_connections 
+	               WHERE (requester_id = $1 AND receiver_id = $2) OR (requester_id = $2 AND receiver_id = $1) 
+	               LIMIT 1`
+	err = DB.QueryRow(checkQuery, requesterId, targetUser.ID).Scan(&existing.ID, &existing.RequesterID, &existing.ReceiverID, &existing.Status, &existing.IsSharingEnabled, &existing.CreatedAt)
+	if err == nil {
+		if existing.Status == "ACCEPTED" {
+			existing.TrusteeUser = targetUser
+			return &existing, nil
+		}
+		if existing.RequesterID == targetUser.ID && existing.ReceiverID == requesterId {
+			// Other user already sent a pending request to you -> auto-accept
+			_ = RespondToConnectionRequest(existing.ID, requesterId, true)
+			existing.Status = "ACCEPTED"
+			existing.TrusteeUser = targetUser
+			return &existing, nil
+		}
+		if existing.RequesterID == requesterId && existing.ReceiverID == targetUser.ID {
+			existing.TrusteeUser = targetUser
+			return &existing, nil
+		}
+	}
+
 	query := `INSERT INTO trustee_connections (requester_id, receiver_id, status, is_sharing_enabled)
 	          VALUES ($1, $2, 'PENDING', TRUE)
 	          ON CONFLICT (requester_id, receiver_id) DO UPDATE SET status = 'PENDING', is_sharing_enabled = TRUE, updated_at = CURRENT_TIMESTAMP
@@ -270,11 +295,12 @@ func RespondToConnectionRequest(connectionId, userId string, accept bool) error 
 }
 
 func GetMyTrustees(userId string) ([]models.TrusteeConnection, error) {
-	query := `SELECT c.id, c.requester_id, c.receiver_id, c.status, c.is_sharing_enabled, c.created_at,
+	query := `SELECT DISTINCT ON (u.id) c.id, c.requester_id, c.receiver_id, c.status, c.is_sharing_enabled, c.created_at,
 	                 u.id, COALESCE(u.user_code, ''), u.full_name, u.phone_number, u.email
 	          FROM trustee_connections c
 	          JOIN users u ON (CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END) = u.id
-	          WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND c.status = 'ACCEPTED'`
+	          WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND c.status = 'ACCEPTED'
+	          ORDER BY u.id, c.created_at DESC`
 	rows, err := DB.Query(query, userId)
 	if err != nil {
 		return nil, err
@@ -296,11 +322,12 @@ func GetMyTrustees(userId string) ([]models.TrusteeConnection, error) {
 }
 
 func GetActiveWards(guardianId string) ([]models.ActiveWard, error) {
-	query := `SELECT c.id, c.is_sharing_enabled,
+	query := `SELECT DISTINCT ON (u.id) c.id, c.is_sharing_enabled,
 	                 u.id, COALESCE(u.user_code, ''), u.full_name, u.phone_number, u.email, u.battery_level, u.is_tracking_active
 	          FROM trustee_connections c
 	          JOIN users u ON (CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END) = u.id
-	          WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND c.status = 'ACCEPTED' AND u.is_tracking_active = true`
+	          WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND c.status = 'ACCEPTED' AND u.is_tracking_active = true
+	          ORDER BY u.id, c.created_at DESC`
 	rows, err := DB.Query(query, guardianId)
 	if err != nil {
 		return nil, err
