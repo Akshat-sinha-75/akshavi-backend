@@ -27,6 +27,8 @@ import { authStorage, StoredUser } from './src/services/authStorage';
 import { startTracking, stopTracking } from './src/services/locationService';
 import AuthScreen from './src/screens/AuthScreen';
 
+import * as ScreenCapture from 'expo-screen-capture';
+
 const { width } = Dimensions.get('window');
 
 export interface GuardianGroup {
@@ -154,6 +156,8 @@ export default function App() {
 
   // Load saved session on mount
   useEffect(() => {
+    ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+
     async function checkAuth() {
       const user = await authStorage.getUser();
       if (user) {
