@@ -2,10 +2,7 @@
 
 ## What It Is
 
-Akshavi is a comprehensive, full-stack platform specifically designed to empower and enhance women's safety in real-time.
-It seamlessly integrates a cross-platform mobile application, a scalable Go backend, and an administrative web dashboard.
-The system delivers continuous protection through intelligent background tracking, one-tap SOS alerts, and a fake PIN duress alarm.
-By utilizing a secure trustee pairing system, it ensures that trusted guardians are instantly notified during any critical situation.
+Akshavi is a comprehensive, full-stack platform designed to enhance women's safety through real-time tracking, emergency SOS alerts, and a trusted guardian connection system. The platform consists of a cross-platform mobile application for end-users, a highly scalable backend for real-time data processing, and a web-based dashboard for administration and emergency monitoring.
 
 ## What It Does
 
