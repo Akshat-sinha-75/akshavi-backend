@@ -1,6 +1,6 @@
-# Raksha — React Native Mobile Application (iOS & Android)
+# Akshavi — React Native Mobile Application (iOS & Android)
 
-This is the native cross-platform mobile application for **Raksha Women Safety**, built with **React Native + Expo + TypeScript**.
+This is the native cross-platform mobile application for **Akshavi Women Safety**, built with **React Native + Expo + TypeScript**.
 
 ---
 

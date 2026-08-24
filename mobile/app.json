@@ -24,10 +24,13 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "location",
+          "fetch",
+          "location",
           "fetch"
         ],
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Raksha requires background location access to share live location with your trusted guardians during Track Me and SOS emergencies.",
-        "NSLocationWhenInUseUsageDescription": "Raksha requires location access to find your position for emergency alerts."
+        "NSLocationWhenInUseUsageDescription": "Raksha requires location access to find your position for emergency alerts.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
