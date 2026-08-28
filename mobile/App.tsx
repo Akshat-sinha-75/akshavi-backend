@@ -14,7 +14,8 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Updates from 'expo-updates';
@@ -25,17 +26,10 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import { Home, Shield, User, LogOut, Key, MapPin, Battery, Settings, Trash2, Edit2, Users, Check } from 'lucide-react-native';
 
 const AkshaviShieldIcon = ({ color, size }: { color: string; size: number }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Circle cx="12" cy="12" r="11" fill="white" stroke={color} strokeWidth="1" />
-    <Path
-      d="M12 4.5L5 7.5v4.5c0 4.7 3.1 9.2 7 10.5 3.9-1.3 7-5.8 7-10.5V7.5l-7-3z"
-      stroke={color}
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      fill="none"
-    />
-  </Svg>
+  <Image 
+    source={require('./assets/362b0537-9ad5-4231-aa6d-23634a4f257d.jpg')} 
+    style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 1, borderColor: color }} 
+  />
 );
 import { api, API_BASE_URL } from './src/services/api';
 import { authStorage, StoredUser } from './src/services/authStorage';

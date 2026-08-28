@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Image
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { api, API_BASE_URL, setCustomApiUrl } from '../services/api';
@@ -205,7 +206,10 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             </Text>
           </View>
           <View style={styles.avatarCircle}>
-            <Shield color="#212529" size={24} />
+            <Image 
+              source={require('../../assets/362b0537-9ad5-4231-aa6d-23634a4f257d.jpg')} 
+              style={{ width: 32, height: 32, borderRadius: 16 }} 
+            />
           </View>
         </View>
 
