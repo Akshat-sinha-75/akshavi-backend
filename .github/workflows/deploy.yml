@@ -3,7 +3,7 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - main # Only run this workflow when code is pushed to the main branch
+      - main 
 
 jobs:
   deploy:
@@ -25,3 +25,4 @@ jobs:
             
             # Rebuild and restart the Docker containers in the background
             sudo docker compose up -d --build
+
