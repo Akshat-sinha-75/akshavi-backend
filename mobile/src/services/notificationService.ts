@@ -2,7 +2,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { api } from './api';
+import { api, API_BASE_URL } from './api';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -12,7 +12,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function registerForPushNotificationsAsync(userId: string) {
+export async function registerForPushNotificationsAsync(userId?: string) {
   let token;
 
   if (Platform.OS === 'android') {
@@ -51,7 +51,7 @@ export async function registerForPushNotificationsAsync(userId: string) {
       // Send token to backend
       if (token && userId) {
           try {
-             await fetch(`${api.getDefaultApiUrl()}/api/auth/fcm-token`, {
+             await fetch(`${API_BASE_URL}/api/auth/fcm-token`, {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({ userId, fcmToken: token })
