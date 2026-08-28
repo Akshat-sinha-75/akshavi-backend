@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/362b0537-9ad5-4231-aa6d-23634a4f257d.jpg",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -36,8 +36,8 @@
     "android": {
       "package": "com.womensafety.raksha",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#030712"
+        "foregroundImage": "./assets/362b0537-9ad5-4231-aa6d-23634a4f257d.jpg",
+        "backgroundColor": "#ffffff"
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",

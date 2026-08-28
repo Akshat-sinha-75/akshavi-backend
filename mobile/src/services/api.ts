@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 
-// Production cloud URL on AWS EC2
+// Production cloud URL on AWS EC2 (via Cloudflare Tunnel)
 function getDefaultApiUrl(): string {
-  return 'http://32.198.255.56:8080';
+  return 'https://concerned-gate-fought-conferences.trycloudflare.com';
 }
 
 export let API_BASE_URL = getDefaultApiUrl();
