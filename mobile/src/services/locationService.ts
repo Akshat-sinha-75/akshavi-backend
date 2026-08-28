@@ -6,6 +6,7 @@ import { api } from './api';
 let lastSentLat = 0;
 let lastSentLng = 0;
 let locationWatcher: Location.LocationSubscription | null = null;
+let isTrackingActiveFlag = false;
 
 function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3;
@@ -33,10 +34,12 @@ export async function requestLocationPermissions(): Promise<boolean> {
 
 export async function startTracking(userId: string, isSOS: boolean, onLocation?: (loc: any) => void) {
   stopTracking();
+  isTrackingActiveFlag = true;
 
   const granted = await requestLocationPermissions();
   if (!granted) {
     console.warn('Location permission denied');
+    isTrackingActiveFlag = false;
     return;
   }
 
@@ -45,7 +48,7 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
     const initialPos = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
-    if (initialPos && onLocation) {
+    if (initialPos && onLocation && isTrackingActiveFlag) {
       let initialBattery = 100;
       try {
         const b = await Battery.getBatteryLevelAsync();
@@ -89,6 +92,8 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
         distanceInterval: distanceInterval,
       },
       async (location) => {
+        if (!isTrackingActiveFlag) return;
+        
         const lat = location.coords.latitude;
         const lng = location.coords.longitude;
         const speed = location.coords.speed || 0;
@@ -115,7 +120,7 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
         const dist = getDistanceMeters(lastSentLat, lastSentLng, lat, lng);
         const shouldSend = isSOS || lastSentLat === 0 || dist >= 10 || speed > 1.0;
 
-        if (shouldSend) {
+        if (shouldSend && isTrackingActiveFlag) {
           lastSentLat = lat;
           lastSentLng = lng;
 
@@ -137,8 +142,10 @@ export async function startTracking(userId: string, isSOS: boolean, onLocation?:
 }
 
 export function stopTracking() {
+  isTrackingActiveFlag = false;
   if (locationWatcher) {
     locationWatcher.remove();
     locationWatcher = null;
   }
 }
+

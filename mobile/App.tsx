@@ -585,7 +585,11 @@ export default function App() {
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
     setIsTracking(val);
     if (!val && currentUser) {
-      await api.stopTracking(currentUser.id);
+      // Small delay to ensure any in-flight location network requests reach the backend
+      // BEFORE the stop request arrives. Otherwise, the location request turns tracking back ON.
+      setTimeout(async () => {
+        await api.stopTracking(currentUser.id);
+      }, 1000);
     }
   };
 
