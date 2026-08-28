@@ -46,6 +46,7 @@
         "FOREGROUND_SERVICE",
         "VIBRATE"
       ],
+      "usesCleartextTraffic": true,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyDwjmXlVfpPKFWCEmyx1soUWNP8SJh6SVg"
