@@ -73,8 +73,10 @@ func autoMigrateTables(db *sql.DB) {
 			kyc_status VARCHAR(20) DEFAULT 'VERIFIED',
 			battery_level INT DEFAULT 100,
 			is_tracking_active BOOLEAN DEFAULT FALSE,
+			fcm_token VARCHAR(255) DEFAULT '',
 			created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 		);`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token VARCHAR(255) DEFAULT '';`,
 		`CREATE TABLE IF NOT EXISTS trustee_connections (
 			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 			requester_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -126,12 +128,12 @@ func generateUserCode() string {
 
 // User Operations
 func GetUserByIdentifier(identifier string) (*models.User, error) {
-	query := `SELECT id, COALESCE(user_code, ''), email, phone_number, password_hash, full_name, age, address, pin_hash, fake_pin_hash, profile_completed, kyc_status, battery_level, is_tracking_active, created_at 
+	query := `SELECT id, COALESCE(user_code, ''), email, phone_number, password_hash, full_name, age, address, pin_hash, fake_pin_hash, profile_completed, kyc_status, battery_level, is_tracking_active, fcm_token, created_at 
 	          FROM users WHERE email = $1 OR phone_number = $1 OR user_code = $1`
 	row := DB.QueryRow(query, identifier)
 
 	var u models.User
-	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.PasswordHash, &u.FullName, &u.Age, &u.Address, &u.PinHash, &u.FakePinHash, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.PasswordHash, &u.FullName, &u.Age, &u.Address, &u.PinHash, &u.FakePinHash, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.FCMToken, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -139,12 +141,12 @@ func GetUserByIdentifier(identifier string) (*models.User, error) {
 }
 
 func GetUserByID(id string) (*models.User, error) {
-	query := `SELECT id, COALESCE(user_code, ''), email, phone_number, password_hash, full_name, age, address, pin_hash, fake_pin_hash, profile_completed, kyc_status, battery_level, is_tracking_active, created_at 
+	query := `SELECT id, COALESCE(user_code, ''), email, phone_number, password_hash, full_name, age, address, pin_hash, fake_pin_hash, profile_completed, kyc_status, battery_level, is_tracking_active, fcm_token, created_at 
 	          FROM users WHERE id = $1`
 	row := DB.QueryRow(query, id)
 
 	var u models.User
-	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.PasswordHash, &u.FullName, &u.Age, &u.Address, &u.PinHash, &u.FakePinHash, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.PasswordHash, &u.FullName, &u.Age, &u.Address, &u.PinHash, &u.FakePinHash, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.FCMToken, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -155,11 +157,11 @@ func GetUserByID(id string) (*models.User, error) {
 func CreateUserAccount(req models.RegisterRequest) (*models.User, error) {
 	query := `INSERT INTO users (email, phone_number, password_hash, full_name, age, address, pin_hash, fake_pin_hash, profile_completed, kyc_status) 
 	          VALUES ($1, $2, $3, '', 0, '', '1234', '9999', FALSE, 'VERIFIED') 
-	          RETURNING id, COALESCE(user_code, ''), email, phone_number, COALESCE(full_name, ''), age, COALESCE(address, ''), profile_completed, kyc_status, battery_level, is_tracking_active, created_at`
+	          RETURNING id, COALESCE(user_code, ''), email, phone_number, COALESCE(full_name, ''), age, COALESCE(address, ''), profile_completed, kyc_status, battery_level, is_tracking_active, fcm_token, created_at`
 	row := DB.QueryRow(query, req.Email, req.PhoneNumber, req.Password)
 
 	var u models.User
-	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.FullName, &u.Age, &u.Address, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.FullName, &u.Age, &u.Address, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.FCMToken, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -172,11 +174,11 @@ func CompleteUserProfile(req models.ProfileSetupRequest) (*models.User, error) {
 	query := `UPDATE users 
 	          SET user_code = $1, full_name = $2, age = $3, address = $4, pin_hash = $5, fake_pin_hash = $6, profile_completed = TRUE 
 	          WHERE id = $7 
-	          RETURNING id, user_code, email, phone_number, full_name, age, address, profile_completed, kyc_status, battery_level, is_tracking_active, created_at`
+	          RETURNING id, user_code, email, phone_number, full_name, age, address, profile_completed, kyc_status, battery_level, is_tracking_active, fcm_token, created_at`
 	row := DB.QueryRow(query, code, req.FullName, req.Age, req.Address, req.PIN, req.FakePIN, req.UserID)
 
 	var u models.User
-	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.FullName, &u.Age, &u.Address, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.FullName, &u.Age, &u.Address, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.FCMToken, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -191,14 +193,41 @@ func UpdateUserStatus(userId string, batteryLevel int, isTrackingActive bool) er
 
 func UpdateProfileDetails(userId, fullName string, age int, address string) (*models.User, error) {
 	query := `UPDATE users SET full_name = $1, age = $2, address = $3 WHERE id = $4
-	          RETURNING id, user_code, email, phone_number, full_name, age, address, profile_completed, kyc_status, battery_level, is_tracking_active, created_at`
+	          RETURNING id, user_code, email, phone_number, full_name, age, address, profile_completed, kyc_status, battery_level, is_tracking_active, fcm_token, created_at`
 	row := DB.QueryRow(query, fullName, age, address, userId)
 	var u models.User
-	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.FullName, &u.Age, &u.Address, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.UserCode, &u.Email, &u.PhoneNumber, &u.FullName, &u.Age, &u.Address, &u.ProfileCompleted, &u.KYCStatus, &u.BatteryLevel, &u.IsTrackingActive, &u.FCMToken, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return &u, nil
+}
+
+func UpdateFCMToken(userId, fcmToken string) error {
+	query := `UPDATE users SET fcm_token = $1 WHERE id = $2`
+	_, err := DB.Exec(query, fcmToken, userId)
+	return err
+}
+
+func GetGuardianFCMTokens(wardId string) ([]string, error) {
+	query := `SELECT u.fcm_token
+	          FROM trustee_connections c
+	          JOIN users u ON (CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END) = u.id
+	          WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND c.status = 'ACCEPTED' AND u.fcm_token != ''`
+	rows, err := DB.Query(query, wardId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tokens []string
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err == nil && token != "" {
+			tokens = append(tokens, token)
+		}
+	}
+	return tokens, nil
 }
 
 func DeleteUserAccount(userId string) error {
@@ -264,6 +293,33 @@ func GetPendingRequestsForUser(userId string) ([]models.TrusteeConnection, error
 	          FROM trustee_connections c
 	          JOIN users u ON c.requester_id = u.id
 	          WHERE c.receiver_id = $1 AND c.status = 'PENDING'`
+	rows, err := DB.Query(query, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.TrusteeConnection
+	for rows.Next() {
+		var c models.TrusteeConnection
+		var u models.User
+		if err := rows.Scan(&c.ID, &c.RequesterID, &c.ReceiverID, &c.Status, &c.IsSharingEnabled, &c.CreatedAt,
+			&u.ID, &u.UserCode, &u.FullName, &u.PhoneNumber, &u.Email); err != nil {
+			return nil, err
+		}
+		c.TrusteeUser = &u
+		list = append(list, c)
+	}
+	return list, nil
+}
+
+func GetSentRequestsForUser(userId string) ([]models.TrusteeConnection, error) {
+	query := `SELECT c.id, c.requester_id, c.receiver_id, c.status, c.is_sharing_enabled, c.created_at,
+	                 u.id, COALESCE(u.user_code, ''), u.full_name, u.phone_number, u.email
+	          FROM trustee_connections c
+	          JOIN users u ON c.receiver_id = u.id
+	          WHERE c.requester_id = $1 AND c.status IN ('PENDING', 'REJECTED')
+	          ORDER BY c.created_at DESC`
 	rows, err := DB.Query(query, userId)
 	if err != nil {
 		return nil, err

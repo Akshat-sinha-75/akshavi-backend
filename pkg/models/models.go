@@ -17,6 +17,7 @@ type User struct {
 	KYCStatus        string    `json:"kycStatus"`
 	BatteryLevel     int       `json:"batteryLevel"`
 	IsTrackingActive bool      `json:"isTrackingActive"`
+	FCMToken         string    `json:"fcmToken,omitempty"`
 	CreatedAt        time.Time `json:"createdAt"`
 }
 

@@ -151,6 +151,16 @@ export const api = {
     }
   },
 
+  async getSentRequests(userId: string) {
+    try {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/api/trustees/sent-requests?userId=${userId}`, {}, 4000);
+      if (response.ok) return await response.json();
+      return [];
+    } catch (e) {
+      return [];
+    }
+  },
+
   async respondTrusteeRequest(connectionId: string, userId: string, accept: boolean) {
     const response = await fetchWithTimeout(`${API_BASE_URL}/api/trustees/respond`, {
       method: 'POST',

@@ -14,6 +14,7 @@ import (
 	"women-safety-app/pkg/cache"
 	"women-safety-app/pkg/db"
 	"women-safety-app/pkg/models"
+	"women-safety-app/pkg/notification"
 	"women-safety-app/pkg/ws"
 )
 
@@ -218,7 +219,34 @@ func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Failed to delete account")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"message": "Account deleted successfully"})
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Logged out successfully"})
+}
+
+func RegisterFCMTokenHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		UserID   string `json:"userId"`
+		FCMToken string `json:"fcmToken"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	if req.UserID == "" || req.FCMToken == "" {
+		writeError(w, http.StatusBadRequest, "userId and fcmToken are required")
+		return
+	}
+
+	if err := db.UpdateFCMToken(req.UserID, req.FCMToken); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update FCM token")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // 2. Trustee Connections Handlers (Request & Pairing System)
@@ -264,6 +292,22 @@ func GetPendingRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	requests, err := db.GetPendingRequestsForUser(userId)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, requests)
+}
+
+func GetSentRequestsHandler(w http.ResponseWriter, r *http.Request) {
+	userId := r.URL.Query().Get("userId")
+	if userId == "" {
+		writeError(w, http.StatusBadRequest, "userId query parameter is required")
+		return
+	}
+
+	requests, err := db.GetSentRequestsForUser(userId)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -390,6 +434,11 @@ func TrackLocationHandler(w http.ResponseWriter, r *http.Request) {
 	db.InsertLocation(&lp)
 	cache.SetLatestLocation(&lp)
 	cache.AppendToTrail(&lp)
+	user, _ := db.GetUserByID(lp.UserID)
+	if user != nil && !user.IsTrackingActive {
+		go notification.NotifyGuardians(lp.UserID, "Tracking Started", fmt.Sprintf("%s has started sharing their live location.", user.FullName), nil)
+	}
+
 	db.UpdateUserStatus(lp.UserID, lp.BatteryLevel, true)
 
 	// Real-time broadcast to Admin and Guardians
@@ -512,6 +561,8 @@ func TriggerSOSHandler(w http.ResponseWriter, r *http.Request) {
 
 	ws.GlobalHub.BroadcastMessage("SOS_TRIGGERED", sosEvt)
 	log.Printf("🚨 EMERGENCY SOS BROADCAST for User: %s (Trigger: %s)", req.UserID, req.TriggerType)
+
+	go notification.NotifyGuardians(req.UserID, "🚨 EMERGENCY SOS", fmt.Sprintf("%s triggered an emergency SOS!", user.FullName), map[string]string{"type": "SOS"})
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":   "SOS_ACTIVE",

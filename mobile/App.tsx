@@ -21,10 +21,26 @@ import * as Updates from 'expo-updates';
 import * as ExpoBattery from 'expo-battery';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker, Polyline } from 'react-native-maps';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { Home, Shield, User, LogOut, Key, MapPin, Battery, Settings, Trash2, Edit2, Users, Check } from 'lucide-react-native';
+
+const AkshaviShieldIcon = ({ color, size }: { color: string; size: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="11" fill="white" stroke={color} strokeWidth="1" />
+    <Path
+      d="M12 4.5L5 7.5v4.5c0 4.7 3.1 9.2 7 10.5 3.9-1.3 7-5.8 7-10.5V7.5l-7-3z"
+      stroke={color}
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);
 import { api, API_BASE_URL } from './src/services/api';
 import { authStorage, StoredUser } from './src/services/authStorage';
 import { startTracking, stopTracking } from './src/services/locationService';
+import { registerForPushNotificationsAsync } from './src/services/notificationService';
 import AuthScreen from './src/screens/AuthScreen';
 
 import * as ScreenCapture from 'expo-screen-capture';
@@ -59,6 +75,7 @@ export default function App() {
   // Trustees & Network State
   const [trustees, setTrustees] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [sentRequests, setSentRequests] = useState<any[]>([]);
   
   // Guardian Groups State
   const [guardianGroups, setGuardianGroups] = useState<GuardianGroup[]>([]);
@@ -166,6 +183,7 @@ export default function App() {
         setEditAge(user.age.toString());
         setEditAddress(user.address);
         loadTrusteesData(user.id);
+        registerForPushNotificationsAsync(user.id);
       }
       setIsAuthLoading(false);
     }
@@ -383,6 +401,9 @@ export default function App() {
       const pending = await api.getPendingRequests(userId);
       setPendingRequests(pending || []);
 
+      const sent = await api.getSentRequests(userId);
+      setSentRequests(sent || []);
+
       await loadGuardianGroups(userId);
     } catch (e) {}
   };
@@ -405,6 +426,7 @@ export default function App() {
     setEditAge(user.age.toString());
     setEditAddress(user.address);
     loadTrusteesData(user.id);
+    registerForPushNotificationsAsync(user.id);
   };
 
   // Real-time WebSocket Guardian Alerts & Notifications
@@ -880,6 +902,33 @@ export default function App() {
         </View>
       ) : null}
 
+      {sentRequests.length > 0 ? (
+        <View style={[styles.whiteCard, { borderColor: '#d1d5db', backgroundColor: '#f9fafb' }]}>
+          <Text style={[styles.cardSectionTitle, { color: '#4b5563' }]}>
+            Sent Requests ({sentRequests.length})
+          </Text>
+          {sentRequests.map(req => (
+            <View key={req.id} style={styles.guardianRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.guardianName}>{req.trusteeUser?.fullName}</Text>
+                <Text style={styles.guardianCode}>{req.trusteeUser?.userCode} • {req.trusteeUser?.phoneNumber}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {req.status === 'PENDING' ? (
+                  <View style={[styles.smallCodePill, { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: '#f59e0b', borderWidth: 1 }]}>
+                    <Text style={[styles.smallCodePillText, { color: '#d97706' }]}>Pending</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.smallCodePill, { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444', borderWidth: 1 }]}>
+                    <Text style={[styles.smallCodePillText, { color: '#b91c1c' }]}>Declined</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       {/* 1. GUARDIAN GROUPS SECTION */}
       <View style={styles.whiteCard}>
         <View style={styles.cardHeaderRow}>
@@ -1155,7 +1204,7 @@ export default function App() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('GUARDIANS')}>
             <View style={styles.navIconCircle}>
-              <Shield color={activeTab === 'GUARDIANS' ? '#212529' : '#9ca3af'} size={22} />
+              <AkshaviShieldIcon color={activeTab === 'GUARDIANS' ? '#212529' : '#9ca3af'} size={22} />
             </View>
           </TouchableOpacity>
           <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('PROFILE')}>
@@ -1681,6 +1730,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
     gap: 14,
+    overflow: 'hidden',
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -1740,7 +1790,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 8,
+    paddingTop: 12,
+    marginTop: 4,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.05)',
   },

@@ -113,10 +113,12 @@ func main() {
 			http.NotFound(w, r)
 		}
 	})
+	mux.HandleFunc("/api/auth/fcm-token", api.RegisterFCMTokenHandler)
 
 	// 2. Trustee Pairing & Granular Sharing
 	mux.HandleFunc("/api/trustees/request", api.SendTrusteeRequestHandler)
 	mux.HandleFunc("/api/trustees/requests", api.GetPendingRequestsHandler)
+	mux.HandleFunc("/api/trustees/sent-requests", api.GetSentRequestsHandler)
 	mux.HandleFunc("/api/trustees/respond", api.RespondTrusteeRequestHandler)
 	mux.HandleFunc("/api/trustees/my-list", api.GetMyTrusteesHandler)
 	mux.HandleFunc("/api/trustees/wards/active", api.GetActiveWardsHandler)
