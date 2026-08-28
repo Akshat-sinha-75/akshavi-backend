@@ -44,9 +44,9 @@ export async function registerForPushNotificationsAsync(userId: string) {
       if (!projectId) {
         throw new Error('Project ID not found');
       }
-      // Using getDevicePushTokenAsync for direct FCM/APNs token
-      token = (await Notifications.getDevicePushTokenAsync()).data;
-      console.log('FCM/APNs Token:', token);
+      // Using getExpoPushTokenAsync for Expo push token
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      console.log('Expo Push Token:', token);
       
       // Send token to backend
       if (token && userId) {

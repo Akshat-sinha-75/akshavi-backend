@@ -83,8 +83,7 @@ nano .env
 ```
 Inside `.env`, make sure to change the default passwords:
 ```env
-DB_PASSWORD=your_super_strong_password
-FCM_SERVER_KEY=your_firebase_server_key
+DB_PASSWORD=Akshatsinha@18
 ```
 
 ### Build & Run
