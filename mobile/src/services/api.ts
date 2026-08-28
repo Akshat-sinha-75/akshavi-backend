@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 
-// Production cloud URL on Render
+// Production cloud URL on AWS EC2
 function getDefaultApiUrl(): string {
-  return 'https://akshavi-backend.onrender.com';
+  return 'http://32.198.255.56:8080';
 }
 
 export let API_BASE_URL = getDefaultApiUrl();
